@@ -1,7 +1,9 @@
 import {
   Contract,
   formatEther,
+  getAddress,
   Interface,
+  isAddress,
   JsonRpcProvider,
   isHexString,
   keccak256,
@@ -14,6 +16,7 @@ import {
 } from 'ethers';
 import registryAbiJson from '../contracts/registryAbi.json';
 import marketplaceAbiJson from '../contracts/marketplaceAbi.json';
+import { verifyTransaction, type VerificationResult } from './transactionService';
 
 const registryAbi = registryAbiJson as InterfaceAbi;
 const marketplaceAbi = marketplaceAbiJson as InterfaceAbi;
@@ -86,105 +89,156 @@ export async function readMarketplace(provider: Provider) {
 }
 
 async function assertContract(provider: Provider, address: string, name: string) {
+  const trimmedAddress = (address || '').trim();
+  if (!trimmedAddress || !isAddress(trimmedAddress)) {
+    throw new Error(`Invalid ${name} address: "${address}". Check your VITE_CONTRACT_${name.toUpperCase()}_ADDRESS in .env.local`);
+  }
+  
+  const checksumAddress = getAddress(trimmedAddress);
   const network = await provider.getNetwork();
+  
   if (network.chainId !== BigInt(networkConfig.chainId)) {
-    throw new Error(`Connected to chain ${network.chainId}, expected ${networkConfig.chainId}.`);
+    throw new Error(`Connected to chain ${network.chainId}, expected ${networkConfig.chainId}. Check MetaMask network settings.`);
   }
-  const code = await provider.getCode(address);
-  if (code === '0x') {
-    throw new Error(`No ${name} bytecode at ${address} on chain ${networkConfig.chainId}; Ganache may have been reset or addresses are stale. Redeploy contracts.`);
+  
+  const code = await provider.getCode(checksumAddress);
+  if (code === '0x' || code === '0x0' || code.length <= 2) {
+    // Before failing, check if the provider is actually reachable and returns something for block number
+    const block = await provider.getBlockNumber().catch(() => -1);
+    throw new Error(
+      `No ${name} bytecode at ${checksumAddress} (chain ${network.chainId}, block ${block}). ` +
+      `Ganache may have been reset or addresses are stale. Redeploy contracts and update .env.local.`
+    );
   }
-}
-
-function eventFrom(receipt: TransactionReceipt, abi: InterfaceAbi, eventName: string) {
-  const contractInterface = new Interface(abi);
-  for (const log of receipt.logs) {
-    try {
-      const parsed = contractInterface.parseLog(log);
-      if (parsed?.name === eventName) {
-        return {
-          name: parsed.name,
-          args: Object.fromEntries(parsed.fragment.inputs.map((input, index) => [input.name, String(parsed.args[index])])),
-        };
-      }
-    } catch {
-      // Receipt may also contain logs emitted by other contracts.
-    }
-  }
-  return null;
-}
-
-async function waitForSuccess(tx: { hash: string; wait: () => Promise<TransactionReceipt | null> }) {
-  const receipt = await tx.wait();
-  if (!receipt || receipt.status !== 1) throw new Error(`Transaction ${tx.hash} failed on chain.`);
-  return receipt;
 }
 
 export async function registerMaterial(signer: Signer, input: { fingerprint: string; storageReference: string; metadata: string }) {
   if (!registryConfigured) throw new Error('Registry contract address is not configured. Deploy locally and restart Vite.');
+  const provider = signer.provider;
+  if (!provider) throw new Error('Signer has no provider.');
+  
+  await assertContract(provider, networkConfig.registryAddress, 'registry');
+  
   const contract = new Contract(networkConfig.registryAddress, registryAbi, signer);
   const fingerprint = fingerprintOf(input.fingerprint);
+  
   const tx = await contract.registerDiscovery(fingerprint, input.storageReference, input.metadata);
-  const receipt = await waitForSuccess(tx);
-  const event = eventFrom(receipt, registryAbi, 'DiscoveryRegistered');
-  if (!event || event.args.fingerprint?.toLowerCase() !== fingerprint.toLowerCase()) {
-    throw new Error(`Transaction ${tx.hash} mined, but the expected registration event was missing.`);
+  
+  const result = await verifyTransaction(tx, {
+    contractAddress: networkConfig.registryAddress,
+    abi: registryAbi,
+    eventName: 'DiscoveryRegistered',
+    validateArgs: (args) => String(args.fingerprint).toLowerCase() === fingerprint.toLowerCase(),
+    checkState: async (c) => {
+      const record = await c.discoveries(fingerprint);
+      return record.creator !== '0x0000000000000000000000000000000000000000';
+    }
+  }, provider);
+
+  if (!result.success) {
+    throw new Error(result.error || `Transaction ${tx.hash} mined, but verification failed.`);
   }
-  const registered = await contract.discoveries(fingerprint);
+
   const creator = await signer.getAddress();
-  if (registered.creator.toLowerCase() !== creator.toLowerCase() || Number(registered.blockNumber) !== receipt.blockNumber) {
-    throw new Error(`Transaction ${tx.hash} mined, but the registry record did not match the receipt.`);
-  }
-  return { transactionHash: tx.hash as string, blockNumber: receipt.blockNumber, creator, fingerprint, event };
+  return { 
+    transactionHash: tx.hash as string, 
+    blockNumber: result.blockNumber, 
+    creator, 
+    fingerprint, 
+    event: result.event 
+  };
 }
 
 export async function createListing(signer: Signer, input: { materialHash: string; priceEth: string; license: string }) {
   if (!marketplaceConfigured) throw new Error('Marketplace contract address is not configured. Deploy locally and restart Vite.');
+  const provider = signer.provider;
+  if (!provider) throw new Error('Signer has no provider.');
+
+  await assertContract(provider, networkConfig.marketplaceAddress, 'marketplace');
+  
   const contract = new Contract(networkConfig.marketplaceAddress, marketplaceAbi, signer);
   const materialHash = fingerprintOf(input.materialHash);
   const price = parseEther(input.priceEth);
+  
   const registeredAddress = await contract.registry() as string;
   if (registeredAddress.toLowerCase() !== networkConfig.registryAddress.toLowerCase()) {
     throw new Error('Marketplace is linked to a different registry address than the configured deployment. Redeploy the contracts.');
   }
+  
   const registry = new Contract(registeredAddress, registryAbi, signer);
   const registeredMaterial = await registry.discoveries(materialHash);
   if (!registeredMaterial.creator || registeredMaterial.creator === '0x0000000000000000000000000000000000000000') {
     throw new Error('Register this generated material on the registry contract before creating a marketplace listing.');
   }
+  
   const tx = await contract.listMaterial(materialHash, price, input.license);
-  const receipt = await waitForSuccess(tx);
-  const event = eventFrom(receipt, marketplaceAbi, 'ListingCreated');
-  if (!event || event.args.materialHash?.toLowerCase() !== materialHash.toLowerCase()) {
-    throw new Error(`Transaction ${tx.hash} mined, but the expected listing event was missing.`);
+  
+  const result = await verifyTransaction(tx, {
+    contractAddress: networkConfig.marketplaceAddress,
+    abi: marketplaceAbi,
+    eventName: 'ListingCreated',
+    validateArgs: (args) => String(args.materialHash).toLowerCase() === materialHash.toLowerCase(),
+    checkState: async (c) => {
+      const listing = await c.listings(materialHash);
+      return listing.seller !== '0x0000000000000000000000000000000000000000' && !listing.sold;
+    }
+  }, provider);
+
+  if (!result.success) {
+    throw new Error(result.error || `Transaction ${tx.hash} mined, but verification failed.`);
   }
-  const listing = await contract.listings(materialHash);
+
   const seller = await signer.getAddress();
-  if (listing.seller.toLowerCase() !== seller.toLowerCase() || listing.price !== price || listing.licenseTerms !== input.license || listing.sold) {
-    throw new Error(`Transaction ${tx.hash} mined, but the stored listing did not match the receipt.`);
-  }
-  return { transactionHash: tx.hash as string, blockNumber: receipt.blockNumber, seller, event };
+  return { 
+    transactionHash: tx.hash as string, 
+    blockNumber: result.blockNumber, 
+    seller, 
+    event: result.event 
+  };
 }
 
 export async function purchaseListing(signer: Signer, materialHash: string) {
   if (!marketplaceConfigured) throw new Error('Marketplace contract address is not configured. Deploy locally and restart Vite.');
+  const provider = signer.provider;
+  if (!provider) throw new Error('Signer has no provider.');
+
+  await assertContract(provider, networkConfig.marketplaceAddress, 'marketplace');
+  
   const contract = new Contract(networkConfig.marketplaceAddress, marketplaceAbi, signer);
   const digest = fingerprintOf(materialHash);
+  
   const listing = await contract.listings(digest);
   if (!listing.seller || listing.seller === '0x0000000000000000000000000000000000000000') throw new Error('Listing not found on chain.');
   if (listing.sold) throw new Error('This listing has already been purchased.');
+  
   const tx = await contract.purchaseMaterial(digest, { value: listing.price });
-  const receipt = await waitForSuccess(tx);
-  const event = eventFrom(receipt, marketplaceAbi, 'ListingPurchased');
+  
+  const result = await verifyTransaction(tx, {
+    contractAddress: networkConfig.marketplaceAddress,
+    abi: marketplaceAbi,
+    eventName: 'ListingPurchased',
+    validateArgs: (args) => String(args.materialHash).toLowerCase() === digest.toLowerCase(),
+    checkState: async (c) => {
+      const updatedListing = await c.listings(digest);
+      return updatedListing.sold;
+    }
+  }, provider);
+
+  if (!result.success) {
+    throw new Error(result.error || `Transaction ${tx.hash} mined, but verification failed.`);
+  }
+
   const buyer = await signer.getAddress();
-  if (!event || event.args.materialHash?.toLowerCase() !== digest.toLowerCase() || event.args.buyer?.toLowerCase() !== buyer.toLowerCase()) {
-    throw new Error(`Transaction ${tx.hash} mined, but the expected purchase event was missing or did not match this wallet.`);
-  }
-  const updatedListing = await contract.listings(digest);
-  if (!updatedListing.sold || updatedListing.buyer.toLowerCase() !== buyer.toLowerCase()) {
-    throw new Error(`Transaction ${tx.hash} mined, but the marketplace does not show this buyer's completed single-sale licence.`);
-  }
-  return { transactionHash: tx.hash as string, blockNumber: receipt.blockNumber, buyer, seller: updatedListing.seller as string, license: updatedListing.licenseTerms as string, event };
+  const finalListing = await contract.listings(digest);
+  
+  return { 
+    transactionHash: tx.hash as string, 
+    blockNumber: result.blockNumber, 
+    buyer, 
+    seller: finalListing.seller as string, 
+    license: finalListing.licenseTerms as string, 
+    event: result.event 
+  };
 }
 
 export function shortHash(hash: string): string {

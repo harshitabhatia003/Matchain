@@ -60,12 +60,23 @@ class BlockchainService:
         artifact_path = ARTIFACTS / f"{name}.sol" / f"{name}.json"
         if not address or not artifact_path.exists():
             return None
-        if not self.web3.is_connected() or self.web3.eth.chain_id != GANACHE_CHAIN_ID:
+        
+        if not self.web3.is_connected():
+            print(f"Warning: Web3 is not connected to {GANACHE_RPC_URL}")
             return None
+            
+        if self.web3.eth.chain_id != GANACHE_CHAIN_ID:
+            print(f"Warning: Connected to chain {self.web3.eth.chain_id}, expected {GANACHE_CHAIN_ID}")
+            return None
+            
         artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
-        checksum_address = Web3.to_checksum_address(address)
-        if not self.web3.eth.get_code(checksum_address):
+        checksum_address = Web3.to_checksum_address(address.strip())
+        
+        code = self.web3.eth.get_code(checksum_address)
+        if not code or code == b'\x00' or code == '0x':
+            print(f"Warning: No bytecode found for {name} at {checksum_address} on chain {GANACHE_CHAIN_ID}")
             return None
+            
         return self.web3.eth.contract(address=checksum_address, abi=artifact["abi"])
 
     def deployment_matches(self) -> bool:
@@ -97,33 +108,72 @@ class BlockchainService:
             return bytes.fromhex(value[2:])
         return Web3.keccak(text=value)
 
-    def _send(self, function, value: int = 0, event=None):
+    def _send(self, function, value: int = 0, event=None, validate_args=None):
         if not self.transactions_enabled:
             raise RuntimeError("Backend signing is disabled; configure an unlocked BLOCKCHAIN_ACCOUNT or sign from MetaMask")
+        
         tx_hash = function.transact({"from": self.account, "value": value})
         receipt = self.web3.eth.wait_for_transaction_receipt(tx_hash)
+        
         if receipt["status"] != 1:
             raise RuntimeError(f"Transaction {tx_hash.hex()} failed on chain")
-        events = event().process_receipt(receipt) if event else []
+            
+        found_events = []
+        if event:
+            # process_receipt automatically filters by the event's contract address
+            all_events = event().process_receipt(receipt)
+            for item in all_events:
+                args = {key: str(value) for key, value in item["args"].items()}
+                if not validate_args or validate_args(item["args"]):
+                    found_events.append({"name": item["event"], "args": args})
+            
+            if not found_events:
+                raise RuntimeError(f"Transaction {tx_hash.hex()} mined, but the expected event was missing or invalid.")
+        
         return {
             "transaction_hash": tx_hash.hex(),
             "block_number": receipt["blockNumber"],
             "receipt_status": receipt["status"],
             "gas_used": receipt["gasUsed"],
-            "events": [
-                {"name": item["event"], "args": {key: str(value) for key, value in item["args"].items()}}
-                for item in events
-            ],
+            "events": found_events,
         }
 
     def register_discovery(self, fingerprint: str, ipfs_cid: str, metadata: str) -> dict[str, Any]:
         if not self.deployment_matches() or self.registry is None:
             raise RuntimeError("Local blockchain contracts are not configured or reachable")
+        
         digest = self.fingerprint(fingerprint)
+        
         receipt = self._send(
             self.registry.functions.registerDiscovery(digest, ipfs_cid, metadata),
             event=self.registry.events.DiscoveryRegistered,
+            validate_args=lambda args: args["fingerprint"] == digest
         )
+        
+        # Verify state
+        record = self.registry.functions.discoveries(digest).call()
+        if record[1] == "0x0000000000000000000000000000000000000000":
+            raise RuntimeError(f"Transaction {receipt['transaction_hash']} mined, but registry record not found.")
+            
+        return {"fingerprint": Web3.to_hex(digest), **receipt}
+
+    def verify_discovery(self, fingerprint: str) -> dict[str, Any]:
+        if not self.deployment_matches() or self.registry is None:
+            raise RuntimeError("Local blockchain contracts are not configured or reachable")
+        
+        digest = self.fingerprint(fingerprint)
+        
+        receipt = self._send(
+            self.registry.functions.verifyDiscovery(digest),
+            event=self.registry.events.DiscoveryVerified,
+            validate_args=lambda args: args["fingerprint"] == digest
+        )
+        
+        # Verify state
+        record = self.registry.functions.discoveries(digest).call()
+        if not record[5]: # verified boolean
+            raise RuntimeError(f"Transaction {receipt['transaction_hash']} mined, but material remains unverified.")
+            
         return {"fingerprint": Web3.to_hex(digest), **receipt}
 
     def get_registry(self) -> list[dict[str, Any]]:
@@ -147,12 +197,21 @@ class BlockchainService:
     def create_listing(self, material_hash: str, price: float, license_terms: str) -> dict[str, Any]:
         if not self.deployment_matches() or self.marketplace is None:
             raise RuntimeError("Local blockchain contracts are not configured or reachable")
+        
         digest = self.fingerprint(material_hash)
         wei_price = self.web3.to_wei(Decimal(str(price)), "ether")
+        
         receipt = self._send(
             self.marketplace.functions.listMaterial(digest, wei_price, license_terms),
             event=self.marketplace.events.ListingCreated,
+            validate_args=lambda args: args["materialHash"] == digest
         )
+        
+        # Verify state
+        listing = self.marketplace.functions.listings(digest).call()
+        if listing[1] == "0x0000000000000000000000000000000000000000" or listing[5]: # seller empty or already sold
+             raise RuntimeError(f"Transaction {receipt['transaction_hash']} mined, but listing state is invalid.")
+             
         return {"material_hash": Web3.to_hex(digest), "price_wei": wei_price, "license": license_terms, **receipt}
 
     def get_marketplace(self) -> list[dict[str, Any]]:
@@ -177,13 +236,22 @@ class BlockchainService:
     def purchase_listing(self, material_hash: str) -> dict[str, Any]:
         if not self.deployment_matches() or self.marketplace is None:
             raise RuntimeError("Local blockchain contracts are not configured or reachable")
+        
         digest = self.fingerprint(material_hash)
         record = self.marketplace.functions.listings(digest).call()
+        
         receipt = self._send(
             self.marketplace.functions.purchaseMaterial(digest),
             value=record[3],
             event=self.marketplace.events.ListingPurchased,
+            validate_args=lambda args: args["materialHash"] == digest
         )
+        
+        # Verify state
+        updated_listing = self.marketplace.functions.listings(digest).call()
+        if not updated_listing[5]: # sold boolean
+            raise RuntimeError(f"Transaction {receipt['transaction_hash']} mined, but listing is not marked as sold.")
+            
         return {"material_hash": Web3.to_hex(digest), "price_wei": record[3], **receipt}
 
     def get_recent_events(self, limit: int = 10) -> list[dict[str, Any]]:
