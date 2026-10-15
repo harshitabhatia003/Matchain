@@ -252,5 +252,11 @@
       ],
       "formula": "Ba2Ti3O3"
     }
+  },
+  "308f7b17cd3e30ef40a6901637d56617a5bc2d76dbab5776dabf100009723048": {
+    "formula": "TiAlV2",
+    "objective": "High-strength aerospace alloy",
+    "density": 4.662211796278192,
+    "e_hull": 0.0
   }
 }

@@ -13,3 +13,6 @@ torch==2.5.1
 xgboost==2.1.1
 matminer==0.9.3
 web3==7.6.0
+chgnet==0.3.0
+matgl==1.1.2
+ase==3.29.0
