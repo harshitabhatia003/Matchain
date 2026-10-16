@@ -66,11 +66,39 @@ Marketplace authorization is enforced by the contract: only the creator recorded
 
 Discovery results are returned only if they pass the existing geometry, thermodynamic hull-energy, and available-model consensus stages. A run can correctly complete with zero final candidates. Without `MP_API_KEY`, the existing scientific pipeline uses its synthetic dataset fallback; CHGNet/M3GNet are optional and their availability is reported per run. Predictions and computed stability are not experimental verification.
 
+## Authentication & User Profiles (Firebase)
+
+MatChain includes a decentralized researcher authentication and profile system powered by **Firebase Auth** and **Cloud Firestore** (100% free tier / Spark plan):
+
+- **Sign-in Methods**: Email & Password and 1-Click Google Sign-In.
+- **Firestore User Profiles**: User documents are stored in the `users/{uid}` collection containing the researcher's full name, academic/research role, institution, and linked MetaMask wallet address.
+- **Web3 Wallet Linking**: Connect your MetaMask wallet to link your on-chain materials discovery and registration history with your user account.
+
+### Firebase Free Tier Setup:
+1. Go to [Firebase Console](https://console.firebase.google.com/) and create a free project.
+2. In **Build > Authentication > Sign-in method**, enable **Email/Password** and **Google**.
+3. In **Build > Firestore Database**, click **Create database** (start in test mode for development).
+4. In **Project Settings > General**, under *Your apps*, click the **Web (`</>`)** icon to register an app.
+5. Copy the configuration credentials into `frontend/.env.local`:
+   ```bash
+   VITE_FIREBASE_API_KEY=AIzaSy...
+   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project
+   VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+   VITE_FIREBASE_MESSAGING_SENDER_ID=123456789...
+   VITE_FIREBASE_APP_ID=1:123456789:web:...
+   ```
+6. Restart the frontend dev server (`npm run dev`).
+
 ## Key files
 
 - `matchain_colab_corrected.py` — legacy scientific engine
 - `backend/app/main.py` — FastAPI entrypoint
 - `backend/app/services/matchain_service.py` — pipeline integration service
-- `frontend/src/App.tsx` — React app shell
+- `frontend/src/App.tsx` — React app shell & navigation
+- `frontend/src/pages/AuthPage.tsx` — Unified Sign In / Sign Up portal
+- `frontend/src/context/AuthContext.tsx` — Firebase auth & Firestore profile provider
+- `frontend/src/lib/firebase.ts` — Firebase client initialization
 - `contracts/contracts/MatChainRegistry.sol` — blockchain registry demo
 - `contracts/contracts/MatChainMarketplace.sol` — marketplace licensing demo
+

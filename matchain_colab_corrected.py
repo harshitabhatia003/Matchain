@@ -761,13 +761,29 @@ def load_all_models(dataset_df):
         print(f"CHGNet could not be loaded: {e}")
 
     m3gnet_calc = None
+    _M3GNET_CANDIDATES = [
+        "M3GNet-PES-MatPES-PBE-2025.2",
+        "M3GNet-PES-2021.2.8-PBE-DIRECT-COMPAT",
+        "M3GNet-PES-2021.2.8-PBE",
+        "M3GNet-PES-2021.2.8",
+    ]
     try:
         import matgl
         from matgl.ext.ase import PESCalculator
-        m3gnet_model = matgl.load_model("M3GNet-PES-MatPES-PBE-2025.2")
-        m3gnet_calc = PESCalculator(potential=m3gnet_model)
-    except Exception as e:
-        print(f"M3GNet could not be loaded: {e}")
+        _m3g_loaded = False
+        for _m3g_name in _M3GNET_CANDIDATES:
+            try:
+                m3gnet_model = matgl.load_model(_m3g_name)
+                m3gnet_calc = PESCalculator(potential=m3gnet_model)
+                print(f"M3GNet loaded: {_m3g_name}")
+                _m3g_loaded = True
+                break
+            except Exception as _m3g_err:
+                print(f"M3GNet model '{_m3g_name}' not available: {_m3g_err}")
+        if not _m3g_loaded:
+            print("M3GNet could not be loaded: no pretrained model was accessible.")
+    except ImportError as e:
+        print(f"M3GNet could not be loaded (import error): {e}")
 
     xgb_model = None
     magpie_featurizer = None

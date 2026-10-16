@@ -25,7 +25,7 @@ export default function DiscoveryPage() {
   const [registrationStatus, setRegistrationStatus] = useState('');
   const [registeringHash, setRegisteringHash] = useState<string | null>(null);
   const [storageConsent, setStorageConsent] = useState(false);
-  const { connected, connect, getSigner } = useWallet();
+  const { connected, connect, getSigner, correctNetwork } = useWallet();
 
   useEffect(() => {
     if (!jobId) return;
@@ -115,6 +115,7 @@ export default function DiscoveryPage() {
     }
   };
 
+  const metamaskInstalled = typeof window !== 'undefined' && Boolean(window.ethereum);
   const candidates = (job?.result?.results ?? []) as GeneratedCandidate[];
   const diagnostics = job?.result?.diagnostics;
 
@@ -230,10 +231,28 @@ export default function DiscoveryPage() {
 
       {requestError && <p role="alert" className="break-all text-sm text-rose-300">{requestError}</p>}
       {registrationStatus && <p role="status" className="break-all text-sm text-indigo-200">{registrationStatus}</p>}
-      {candidates.length > 0 && <label className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-100">
-        <input type="checkbox" checked={storageConsent} onChange={(event) => setStorageConsent(event.target.checked)} className="mt-1" />
-        <span>Before registering, upload this structure and its metadata to configured storage. If that provider is public IPFS, uploaded content may be publicly retrievable and cannot be made confidential by this application. Do not upload confidential or restricted material data. With no IPFS provider configured, the backend uses its explicitly labelled local JSON fallback.</span>
-      </label>}
+      {candidates.length > 0 && (
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-100">
+            <input type="checkbox" checked={storageConsent} onChange={(event) => setStorageConsent(event.target.checked)} className="mt-1" />
+            <span>Before registering, upload this structure and its metadata to configured storage. If that provider is public IPFS, uploaded content may be publicly retrievable and cannot be made confidential by this application. Do not upload confidential or restricted material data. With no IPFS provider configured, the backend uses its explicitly labelled local JSON fallback.</span>
+          </label>
+          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-sm">
+            <p className="font-medium text-slate-200 mb-2">To register on-chain, you need:</p>
+            <ol className="space-y-1 text-slate-400 list-decimal list-inside">
+              <li className={storageConsent ? 'text-emerald-300' : 'text-amber-300'}>
+                {storageConsent ? '✓ Storage consent given' : '✗ Check the consent box above'}
+              </li>
+              <li className={metamaskInstalled ? 'text-emerald-300' : 'text-rose-300'}>
+                {metamaskInstalled ? '✓ MetaMask detected' : '✗ MetaMask not detected — install the MetaMask browser extension'}
+              </li>
+              <li className={connected ? 'text-emerald-300' : 'text-slate-400'}>
+                {connected ? `✓ Wallet connected (${correctNetwork ? 'correct network' : 'wrong network — switch to chain 1337 in MetaMask'})` : '○ Click "Connect MetaMask" in the top bar, then switch to Ganache (chain 1337)'}
+              </li>
+            </ol>
+          </div>
+        </div>
+      )}
 
       {diagnostics && <section className="card p-5">
         <h2 className="text-lg font-semibold text-white">Actual pipeline diagnostics</h2>
