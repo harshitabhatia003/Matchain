@@ -18,14 +18,53 @@ const initialForm = {
 export default function DiscoveryPage() {
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState<string>('Ready');
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [job, setJob] = useState<DiscoveryJob | null>(null);
+  const [jobId, setJobId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('matchain_active_discovery_job_id');
+      if (saved && saved !== 'cleared') return saved;
+      return null;
+    } catch {
+      return null;
+    }
+  });
+  const [job, setJob] = useState<DiscoveryJob | null>(() => {
+    try {
+      const savedId = localStorage.getItem('matchain_active_discovery_job_id');
+      if (savedId && savedId !== 'cleared') {
+        const cached = sessionStorage.getItem(`matchain_discovery_job_data_${savedId}`);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch {}
+    return null;
+  });
   const [requestError, setRequestError] = useState('');
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState('');
   const [registeringHash, setRegisteringHash] = useState<string | null>(null);
   const [storageConsent, setStorageConsent] = useState(false);
   const { connected, connect, getSigner, correctNetwork } = useWallet();
+
+  // If no job in state, check if there is a recent completed discovery run on the backend
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('matchain_active_discovery_job_id');
+      if (saved === 'cleared') return;
+    } catch {}
+
+    if (!jobId) {
+      fetchJson<{ recent_jobs?: Array<{ id: string; status: string }> }>('/api/dashboard/stats')
+        .then((stats) => {
+          const latestCompleted = stats?.recent_jobs?.find((j) => j.status === 'completed');
+          if (latestCompleted?.id) {
+            setJobId(latestCompleted.id);
+            try {
+              localStorage.setItem('matchain_active_discovery_job_id', latestCompleted.id);
+            } catch {}
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [jobId]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -38,6 +77,9 @@ export default function DiscoveryPage() {
         setJob(current);
         if (current.status === 'completed') {
           setStatus('Generation completed');
+          try {
+            sessionStorage.setItem(`matchain_discovery_job_data_${jobId}`, JSON.stringify(current));
+          } catch {}
           return;
         }
         if (current.status === 'failed') {
@@ -89,10 +131,27 @@ export default function DiscoveryPage() {
       const data = await postJson<{ job_id: string }>('/api/discovery/generate', payload);
       setStatus('Queued');
       setJobId(data.job_id);
+      try {
+        localStorage.setItem('matchain_active_discovery_job_id', data.job_id);
+      } catch {}
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : 'Failed to start the scientific discovery job.');
       setStatus('Job failed to start');
     }
+  };
+
+  const handleClear = () => {
+    setJob(null);
+    setJobId(null);
+    setSelectedHash(null);
+    setRegistrationStatus('');
+    setStatus('Ready');
+    try {
+      if (jobId) {
+        sessionStorage.removeItem(`matchain_discovery_job_data_${jobId}`);
+      }
+      localStorage.setItem('matchain_active_discovery_job_id', 'cleared');
+    } catch {}
   };
 
   const registerCandidate = async (candidate: GeneratedCandidate) => {
@@ -218,8 +277,17 @@ export default function DiscoveryPage() {
         <div className="mt-6 flex items-center gap-3">
           <button type="submit" disabled={status === 'Queued' || status.startsWith('Generating') || status === 'Submitting job...'} className="button-primary disabled:opacity-50">Run generation</button>
           <button type="button" className="button-secondary" onClick={() => setForm(initialForm)}>
-            Reset
+            Reset Form
           </button>
+          {(job || jobId) && (
+            <button
+              type="button"
+              className="button-secondary text-rose-300 hover:text-rose-200 border-rose-800/40 hover:bg-rose-950/30"
+              onClick={handleClear}
+            >
+              Clear Results
+            </button>
+          )}
         </div>
 
         <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/80 p-3 text-sm text-slate-300">
