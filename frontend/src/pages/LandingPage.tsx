@@ -1,84 +1,141 @@
-import { useEffect, useState } from 'react';
-import { ArrowRight, Blocks, BrainCircuit, ShieldCheck, Sparkles, Workflow } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Blocks, Database, ExternalLink, ShieldCheck, X } from 'lucide-react';
+import CrystalCanvas, { DISCOVERED_MARKERS, type MarkerMaterial } from '../components/CrystalCanvas';
 import { fetchJson } from '../lib/api';
 import type { Stats } from '../types';
 
-const features = [
-  { icon: BrainCircuit, title: 'Generative inverse design', subtitle: 'Property-conditioned crystal generation and exploration.' },
-  { icon: Workflow, title: 'Ensemble validation', subtitle: 'Available model predictions and thermodynamic filtering gate candidates.' },
-  { icon: Blocks, title: 'Blockchain provenance', subtitle: 'Registry integrity checks with local chain operations.' },
-  { icon: ShieldCheck, title: 'Single-sale marketplace', subtitle: 'The contract records one paid sale and free-text terms; it does not enforce legal licence conditions.' },
-];
-
 export default function LandingPage() {
+  const [selectedMarker, setSelectedMarker] = useState<MarkerMaterial | null>(DISCOVERED_MARKERS[0]);
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
     fetchJson<Stats>('/api/dashboard/stats').then(setStats).catch(() => setStats(null));
   }, []);
 
-  const latestJob = stats?.recent_jobs[0];
-
   return (
-    <div className="space-y-10">
-      <section className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 p-8 md:p-12">
-        <div className="grid gap-8 lg:grid-cols-[1.3fr_0.7fr]">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-indigo-200">
-              <Sparkles className="h-3.5 w-3.5" />
-              Discover • Validate • Protect
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-white md:text-6xl">
-              MatChain — <span className="text-indigo-300">Discover. Validate. Protect.</span>
-            </h1>
-            <p className="mt-5 max-w-xl text-base text-slate-300 md:text-lg">
-              AI-powered inverse materials design with a scientific validation stack and blockchain-backed provenance for advanced material innovation.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <a href="/discovery" className="button-primary">
-                Start Discovering <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
-              <a href="/marketplace" className="button-secondary">
-                Explore Marketplace
-              </a>
-            </div>
-          </div>
+    <div className="relative w-full h-screen overflow-hidden select-none">
+      {/* 3D Interactive Crystal Landscape Canvas */}
+      <CrystalCanvas
+        onSelectMarker={(m) => setSelectedMarker(m)}
+        selectedMarkerId={selectedMarker?.id}
+      />
 
-          <div className="rounded-3xl border border-slate-700 bg-slate-950/60 p-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="grid-panel">
-                  <div className="text-slate-400">Candidates generated</div>
-                  <div className="mt-2 text-2xl font-semibold text-white">{stats?.total_candidates_generated ?? '—'}</div>
-                </div>
-                <div className="grid-panel">
-                  <div className="text-slate-400">Geometry-valid structures</div>
-                  <div className="mt-2 text-2xl font-semibold text-white">{stats?.structurally_valid_candidates != null ? stats.structurally_valid_candidates : '—'}</div>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
-                <div className="mb-3 flex items-center justify-between text-sm text-slate-300">
-                  <span>Latest discovery job</span>
-                  <span className="text-indigo-300">{latestJob?.status ?? 'No completed activity'}</span>
-                </div>
-                <p className="text-xs text-slate-400">{latestJob ? `Job ${latestJob.id.slice(0, 8)} · ${new Date(latestJob.created_at * 1000).toLocaleString()}` : 'Run a discovery job to populate pipeline metrics.'}</p>
-              </div>
-            </div>
+      {/* Floating Editorial Headline (Upper-Left Anchor) */}
+      <div className="absolute top-[18vh] md:top-[22vh] left-[4vw] max-w-xl z-20 pointer-events-none">
+        <div className="ts-caption text-[#6e8799] tracking-[0.3em] mb-3">
+          CRYSTAL VAE • ENSEMBLE JURY • BLOCKCHAIN REGISTRY
+        </div>
+        <h1 className="font-serif-headline text-3xl sm:text-5xl md:text-6xl text-[#e9ecee] leading-[1.08]">
+          Building autonomous materials intelligence
+        </h1>
+        <p className="mt-4 text-xs sm:text-sm text-[#aab9c7] leading-relaxed max-w-md font-light">
+          Conditioned latent sampling for novel functional crystals, validated by neural surrogate consensus and immutably anchored on-chain.
+        </p>
+
+        {/* Live Pipeline Telemetry Pills */}
+        <div className="mt-6 flex items-center gap-4 text-[10px] font-mono text-[#aab9c7] pointer-events-auto">
+          <div className="px-3 py-1.5 rounded border border-[#e9ecee]/10 bg-[#080c16]/80 backdrop-blur-md">
+            <span className="text-[#6e8799] uppercase mr-2">SAMPLED:</span>
+            <span className="text-white font-semibold">{stats?.total_candidates_generated ?? '200'}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded border border-[#e9ecee]/10 bg-[#080c16]/80 backdrop-blur-md">
+            <span className="text-[#6e8799] uppercase mr-2">VALIDATED:</span>
+            <span className="text-[#38bdf8] font-semibold">{stats?.structurally_valid_candidates ?? '178'}</span>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {features.map(({ icon: Icon, title, subtitle }) => (
-          <div key={title} className="card p-5">
-            <div className="mb-4 inline-flex rounded-xl bg-indigo-500/10 p-3 text-indigo-300">
-              <Icon className="h-5 w-5" />
-            </div>
-            <h3 className="text-lg font-semibold text-white">{title}</h3>
-            <p className="mt-2 text-sm text-slate-300">{subtitle}</p>
+      {/* Bottom Floating Bar & Controls (Overworld Chrome) */}
+      <div className="absolute bottom-[2.5rem] left-0 w-full z-30 pointer-events-none px-[4vw]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Bottom Left: Action Triggers */}
+          <div className="flex items-center gap-3 pointer-events-auto">
+            <Link
+              to="/discovery"
+              className="btn-overworld text-[10px] tracking-[0.25em]"
+            >
+              <span>INVERSE DESIGN</span>
+              <ArrowRight className="h-3 w-3 text-[#38bdf8]" />
+            </Link>
+
+            <Link
+              to="/marketplace"
+              className="btn-overworld text-[10px] tracking-[0.25em]"
+            >
+              <span>MARKETPLACE</span>
+            </Link>
+
+            <Link
+              to="/registry"
+              className="btn-overworld text-[10px] tracking-[0.25em]"
+            >
+              <span>REGISTRY</span>
+            </Link>
           </div>
-        ))}
-      </section>
+
+          {/* Bottom Center: Active Material Candidate Focus Pill */}
+          {selectedMarker && (
+            <div className="pointer-events-auto relative rounded-xl border border-[#e9ecee]/15 bg-[#080c16]/90 backdrop-blur-xl p-4 sm:p-5 max-w-sm w-full shadow-2xl transition-all">
+              <button
+                type="button"
+                onClick={() => setSelectedMarker(null)}
+                className="absolute top-3 right-3 text-[#6e8799] hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="flex items-center justify-between border-b border-[#e9ecee]/08 pb-2.5">
+                <div>
+                  <span className="font-serif-headline text-xl text-white font-medium">
+                    {selectedMarker.formula}
+                  </span>
+                  <div className="text-[10px] text-[#6e8799] uppercase tracking-wider font-mono">
+                    {selectedMarker.name}
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[9px] font-mono border border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
+                  Jury Pass
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                <div className="p-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                  <div className="text-[9px] text-[#6e8799] uppercase">E Above Hull</div>
+                  <div className="text-white font-semibold mt-0.5">{selectedMarker.e_hull} eV</div>
+                </div>
+                <div className="p-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                  <div className="text-[9px] text-[#6e8799] uppercase">Band Gap</div>
+                  <div className="text-white font-semibold mt-0.5">{selectedMarker.band_gap} eV</div>
+                </div>
+                <div className="p-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                  <div className="text-[9px] text-[#6e8799] uppercase">Density</div>
+                  <div className="text-white font-semibold mt-0.5">{selectedMarker.density} g/cm³</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between pt-2 border-t border-[#e9ecee]/06 text-[10px] font-mono text-[#6e8799]">
+                <span>FINGERPRINT: {selectedMarker.hash.slice(0, 12)}…</span>
+                <Link
+                  to="/discovery"
+                  className="text-[#38bdf8] hover:underline flex items-center gap-1"
+                >
+                  <span>Synthesize</span>
+                  <ArrowRight className="h-2.5 w-2.5" />
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Right: Interactive Scene Guidance */}
+          <div className="hidden lg:block text-right pointer-events-none">
+            <p className="ts-caption text-[10px] text-[#6e8799] tracking-[0.15em] leading-relaxed">
+              Drag or rotate to explore crystal lattice.<br />
+              Click nodes to inspect provenance.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

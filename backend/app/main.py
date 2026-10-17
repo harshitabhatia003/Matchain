@@ -11,6 +11,7 @@ from app.services.blockchain_service import BlockchainService
 from app.services.matchain_service import MatchainService
 from app.services.storage_service import StorageService
 
+# Reload trigger for pipeline consensus updates
 app = FastAPI(title="MatChain API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,

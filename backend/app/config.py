@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8000"))

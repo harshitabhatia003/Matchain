@@ -40,6 +40,7 @@ interface AuthContextType {
   logOut: () => Promise<void>;
   updateUserProfile: (data: { displayName?: string; role?: string; organization?: string }) => Promise<void>;
   linkWalletAddress: (address: string) => Promise<void>;
+  signInAsGuest: () => void;
   formatAuthError: (error: any) => string;
 }
 
@@ -227,6 +228,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInAsGuest = () => {
+    const guestUser = {
+      uid: 'guest-researcher',
+      email: 'lead.scientist@matchain.org',
+      displayName: 'Lead Materials Scientist',
+    } as unknown as User;
+    setUser(guestUser);
+    setUserProfile({
+      uid: 'guest-researcher',
+      email: 'lead.scientist@matchain.org',
+      displayName: 'Lead Materials Scientist',
+      role: 'Principal Investigator',
+      organization: 'MatChain Quantum Lab',
+      walletAddress: null,
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -240,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logOut,
         updateUserProfile,
         linkWalletAddress,
+        signInAsGuest,
         formatAuthError,
       }}
     >

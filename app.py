@@ -27,15 +27,88 @@ from matchain_colab_corrected import (
 # Page Configuration
 st.set_page_config(
     page_title="MatChain — Inverse Materials Discovery",
-    page_icon="⚛️",
+    page_icon="M",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# Inject High-End Obsidian & Titanium Design System
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+html, body, [data-testid="stAppViewContainer"] {
+    background-color: #090b10 !important;
+    color: #f1f5f9 !important;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #0c1017 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Outfit', sans-serif !important;
+    letter-spacing: -0.02em !important;
+    color: #ffffff !important;
+}
+
+div[data-testid="stMetricValue"] {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 1.75rem !important;
+    font-weight: 600 !important;
+    color: #f8fafc !important;
+}
+
+div[data-testid="metric-container"] {
+    background: linear-gradient(145deg, rgba(16, 21, 31, 0.75) 0%, rgba(10, 14, 21, 0.85) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 1rem !important;
+    padding: 1rem !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    transition: transform 0.2s ease, border-color 0.2s ease !important;
+}
+
+div[data-testid="metric-container"]:hover {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    transform: translateY(-2px) !important;
+}
+
+button[kind="primary"] {
+    background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%) !important;
+    color: #0a0d14 !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(251, 191, 36, 0.4) !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+    transition: all 0.2s ease !important;
+}
+
+button[kind="primary"]:hover {
+    background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%) !important;
+    transform: translateY(-1px) !important;
+}
+
+div[data-baseweb="input"] {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 0.75rem !important;
+}
+
+div[data-testid="stExpander"] {
+    background: rgba(14, 18, 27, 0.7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 1rem !important;
+    backdrop-filter: blur(12px) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Application Header & Branding
-st.title("⚛️ MatChain")
-st.markdown("### Generative Inverse Design for Materials + Blockchain Provenance")
-st.caption("🔬 *Property-conditioned Crystal VAE, Multi-Model Ensemble Jury (CHGNet, M3GNet, XGBoost), and Cryptographic Ledger Verification.*")
+st.title("MatChain")
+st.markdown("### Generative Inverse Design for Materials with Blockchain Provenance")
+st.caption("*Property-conditioned Crystal VAE, Multi-Model Ensemble Jury (CHGNet, M3GNet, XGBoost), and Cryptographic Ledger Verification.*")
 
 # --- Streamlit Caching for Performance ---
 @st.cache_data(show_spinner=False)
@@ -47,7 +120,7 @@ def cached_load_all_models(_dataset_df):
     return load_all_models(_dataset_df)
 
 # Sidebar Configuration
-st.sidebar.title("🛠️ Control Panel")
+st.sidebar.title("Control Panel")
 
 # Safe handling of st.secrets for Materials Project API Key
 default_api_key = ""
@@ -81,7 +154,7 @@ enable_relaxation = st.sidebar.checkbox(
     help="Optionally optimizes generated atomic coordinates using CHGNet StructOptimizer before thermodynamic filtering."
 )
 
-role = st.sidebar.radio("Navigation", ["Inventor Dashboard", "📊 Model Performance & Analytics", "Marketplace", "Ledger Explorer"])
+role = st.sidebar.radio("Navigation", ["Inventor Dashboard", "Model Performance & Analytics", "Marketplace", "Ledger Explorer"])
 
 # --- Load Core Dataset & Models ---
 with st.spinner("Initializing MatChain core engine & loading neural models..."):
@@ -91,16 +164,16 @@ with st.spinner("Initializing MatChain core engine & loading neural models..."):
 # Display model availability status in sidebar
 availability = models.get("model_availability", {})
 st.sidebar.markdown("---")
-st.sidebar.subheader("🤖 Model Availability Status")
-st.sidebar.write(f"• **CHGNet:** {'✅ Active' if availability.get('chgnet') else '⚠️ Unavailable'}")
-st.sidebar.write(f"• **M3GNet (PES):** {'✅ Active' if availability.get('m3gnet') else '⚠️ Unavailable'}")
-st.sidebar.write(f"• **XGBoost (Magpie):** {'✅ Active' if availability.get('xgboost') else '⚠️ Unavailable'}")
+st.sidebar.subheader("Model Availability Status")
+st.sidebar.write(f"• **CHGNet:** {'Active' if availability.get('chgnet') else 'Unavailable'}")
+st.sidebar.write(f"• **M3GNet (PES):** {'Active' if availability.get('m3gnet') else 'Unavailable'}")
+st.sidebar.write(f"• **XGBoost (Magpie):** {'Active' if availability.get('xgboost') else 'Unavailable'}")
 
 # =========================================================
 # NAVIGATION TAB 1: INVENTOR DASHBOARD
 # =========================================================
 if role == "Inventor Dashboard":
-    st.header("🎯 Inverse Design Engine")
+    st.header("Inverse Design Engine")
     
     col_input1, col_input2 = st.columns([2, 1])
 
@@ -110,7 +183,7 @@ if role == "Inventor Dashboard":
             "Lightweight alloy for aerospace application",
             help="Descriptive design intent. Numerical targets below drive the inverse VAE generator."
         )
-        st.caption("ℹ️ *Note: Numerical property targets below condition the inverse design engine.*")
+        st.caption("*Note: Numerical property targets below condition the inverse design engine.*")
 
     with col_input2:
         n_candidates = st.slider(
@@ -130,7 +203,7 @@ if role == "Inventor Dashboard":
     with c3:
         density = st.slider("Density (g/cm³)", 1.0, 15.0, 5.0, step=0.1)
 
-    if st.button("🚀 Run Generation & Validation Pipeline", type="primary"):
+    if st.button("Run Generation & Validation Pipeline", type="primary"):
         with st.spinner("Generating candidate structures, evaluating thermodynamics & running ensemble jury..."):
             target_condition = {
                 "formation_energy_per_atom": form_e,
@@ -169,14 +242,14 @@ if role == "Inventor Dashboard":
         m6.metric("6. Final Validated", diagnostics.get("final_validated", 0))
 
         if results:
-            st.success(f"Discovered and validated **{len(results)}** candidate materials in {elapsed:.2f} seconds!")
+            st.success(f"Discovered and validated **{len(results)}** candidate materials in {elapsed:.2f} seconds.")
         else:
-            st.warning("⚠️ Discovered and validated **0** candidate materials.")
-            st.info("💡 **Diagnostic Analysis**: See the exact pipeline accounting breakdown below to inspect where candidates were filtered.")
+            st.warning("Discovered and validated **0** candidate materials.")
+            st.info("**Diagnostic Analysis**: See the exact pipeline accounting breakdown below to inspect where candidates were filtered.")
 
         # Detailed Diagnostic Breakdown Expander
-        with st.expander("📊 Exact Pipeline Diagnostic Accounting", expanded=(len(results) == 0)):
-            st.caption("🔬 *This demo uses a property-conditioned composition+lattice VAE with structure grounding from the Materials Project dataset. It is a simplified stand-in for the full CDVAE described in the paper.*")
+        with st.expander("Exact Pipeline Diagnostic Accounting", expanded=(len(results) == 0)):
+            st.caption("*This demo uses a property-conditioned composition+lattice VAE with structure grounding from the Materials Project dataset. It is a simplified stand-in for the full CDVAE described in the paper.*")
             st.markdown("#### Pipeline Filtering Flow (Conservation Laws Enforced)")
             st.write(f"1. **Candidates Generated by VAE:** `{diagnostics.get('generated', 0)}`")
             st.write(f"2. **Geometry Check:** `{diagnostics.get('geometry_valid', 0)}` valid | `{diagnostics.get('geometry_rejected', 0)}` rejected (lattice/collision cutoff $< 0.7\\text{{\\AA}}$)")
@@ -221,7 +294,7 @@ if role == "Inventor Dashboard":
 
         # Render Candidates Display Cards & 3D Visualizer
         if results:
-            st.subheader("🏆 Validated Top Candidate Discoveries")
+            st.subheader("Validated Top Candidate Discoveries")
             for idx, res in enumerate(results):
                 struct = res["structure"]
                 formula = struct.composition.reduced_formula
@@ -243,7 +316,7 @@ if role == "Inventor Dashboard":
                         st.write(f"• XGBoost: `{m_preds.get('xgboost', 'N/A')}`")
 
                         # Register on Blockchain Button
-                        if st.button(f"🔗 Register {formula} on Blockchain Ledger", key=f"reg_{idx}"):
+                        if st.button(f"Register {formula} on Blockchain Ledger", key=f"reg_{idx}"):
                             block = register_discovery(
                                 struct,
                                 creator_id="Inventor_0x71C...",
@@ -272,9 +345,9 @@ if role == "Inventor Dashboard":
 # =========================================================
 # NAVIGATION TAB 2: MODEL PERFORMANCE & ANALYTICS
 # =========================================================
-elif role == "📊 Model Performance & Analytics":
-    st.header("📊 Model Performance & Evaluation Analytics")
-    st.caption("🔬 *Quantitative evaluation of surrogate models on a 20% held-out test set from Materials Project (eV/atom), VAE training loss curves, and inverse design target matching.*")
+elif role == "Model Performance & Analytics":
+    st.header("Model Performance & Evaluation Analytics")
+    st.caption("*Quantitative evaluation of surrogate models on a 20% held-out test set from Materials Project (eV/atom), VAE training loss curves, and inverse design target matching.*")
 
     eval_results = models.get("eval_results", {})
 
@@ -391,13 +464,13 @@ elif role == "📊 Model Performance & Analytics":
         p_c3.metric("Jury Consensus Rate", f"{(j_pass / max(1, j_eval) * 100):.1f}%", f"{j_pass} / {j_eval}")
         p_c4.metric("Final Validation Rate", f"{(j_pass / max(1, gen_cnt) * 100):.1f}%", f"{j_pass} / {gen_cnt}")
     else:
-        st.info("💡 Run the Inverse Design Pipeline on the Inventor Dashboard tab to generate target matching & stage conversion pass rate analytics.")
+        st.info("Run the Inverse Design Pipeline on the Inventor Dashboard tab to generate target matching & stage conversion pass rate analytics.")
 
 # =========================================================
 # NAVIGATION TAB 3: MARKETPLACE
 # =========================================================
 elif role == "Marketplace":
-    st.header("🏪 Decentralized Materials Marketplace")
+    st.header("Decentralized Materials Marketplace")
     st.caption("Trade validated crystal discoveries with simulated IPFS content keys.")
     
     market = _load_json(MARKETPLACE_PATH, {})
@@ -406,12 +479,12 @@ elif role == "Marketplace":
     col_m1, col_m2 = st.columns([1, 1])
 
     with col_m1:
-        st.subheader("🛒 Active Listings")
+        st.subheader("Active Listings")
         if not market:
             st.info("No active marketplace listings.")
         else:
             for h, item in list(market.items()):
-                status_badge = "🔴 Sold" if item.get("sold") else "🟢 Available"
+                status_badge = "[Sold]" if item.get("sold") else "[Available]"
                 st.write(f"**Hash:** `{h[:16]}...` | **Price:** `{item['price']} ETH` | {status_badge}")
                 if not item.get("sold"):
                     if st.button(f"Buy Material ({h[:8]})", key=f"buy_{h}"):
@@ -422,7 +495,7 @@ elif role == "Marketplace":
                             st.error(f"Purchase Error: {res['status']}")
 
     with col_m2:
-        st.subheader("➕ List Discovery for Sale")
+        st.subheader("List Discovery for Sale")
         if not ledger:
             st.warning("No discoveries registered on ledger yet.")
         else:
@@ -438,7 +511,7 @@ elif role == "Marketplace":
 # NAVIGATION TAB 4: LEDGER EXPLORER
 # =========================================================
 elif role == "Ledger Explorer":
-    st.header("🔗 Blockchain Ledger Provenance Explorer")
+    st.header("Blockchain Ledger Provenance Explorer")
     st.caption("Cryptographic audit trail of registered material discoveries.")
 
     ledger = _load_json(LEDGER_PATH, [])

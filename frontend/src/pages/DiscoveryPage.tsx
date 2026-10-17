@@ -1,4 +1,18 @@
 import { useEffect, useState } from 'react';
+import {
+  Atom,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  RotateCcw,
+  Trash2,
+  AlertTriangle,
+  Layers,
+  ShieldCheck,
+  Cpu,
+  ArrowRight,
+  ExternalLink,
+} from 'lucide-react';
 import { fetchJson, postJson } from '../lib/api';
 import { registryConfigured } from '../services/contractClient';
 import { registerGeneratedCandidate, type GeneratedCandidate } from '../services/registration';
@@ -177,71 +191,104 @@ export default function DiscoveryPage() {
   const metamaskInstalled = typeof window !== 'undefined' && Boolean(window.ethereum);
   const candidates = (job?.result?.results ?? []) as GeneratedCandidate[];
   const diagnostics = job?.result?.diagnostics;
+  const isGenerating = status === 'Queued' || status.startsWith('Generating') || status === 'Submitting job...';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-white">Material Discovery</h1>
-        <p className="mt-2 text-slate-400">Run the MatChain inverse-design job from the backend engine.</p>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight text-white">Inverse Materials Design</h1>
+        <p className="mt-1 text-sm text-slate-400 font-light">Condition the Crystal VAE generator on target electronic and mechanical properties.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card p-6">
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="md:col-span-2 text-sm text-slate-300">
-            Research objective (descriptive; numerical target fields condition the current model)
+      {/* Inverse Design Formulation Form */}
+      <form onSubmit={handleSubmit} className="card p-6 md:p-8">
+        <div className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-white/[0.05] border border-white/[0.08] text-amber-300">
+              <Atom className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="font-heading text-base font-semibold text-white">Conditioning Parameters</h2>
+              <p className="text-xs text-slate-400">Target latent conditions and ensemble jury consensus settings.</p>
+            </div>
+          </div>
+          <span className="text-xs font-mono px-2.5 py-1 rounded-md bg-white/[0.04] text-slate-400 border border-white/[0.06]">
+            VAE Engine
+          </span>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Natural Language Objective (Descriptive Intent)
+            </label>
             <input
               value={form.objective}
               onChange={(e) => handleChange('objective', e.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-400/50 focus:outline-none transition-colors"
+              placeholder="e.g. Ultra-high temperature ceramic for thermal shielding"
             />
-          </label>
+            <p className="mt-1.5 text-[11px] text-slate-500 font-mono">
+              Numerical target properties below directly condition the inverse design neural latent space.
+            </p>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Formation energy (eV/atom)
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Formation Energy (eV/atom)
+            </label>
             <input
               type="number"
               step="0.1"
               value={form.formation_energy_per_atom}
               onChange={(e) => handleChange('formation_energy_per_atom', e.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Band gap (eV)
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Band Gap (eV)
+            </label>
             <input
               type="number"
               step="0.1"
               value={form.band_gap}
               onChange={(e) => handleChange('band_gap', e.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Density (g/cm³)
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Target Density (g/cm³)
+            </label>
             <input
               type="number"
               step="0.1"
               value={form.density}
               onChange={(e) => handleChange('density', e.target.value)}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Number of candidates
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Candidates to Sample
+            </label>
             <input
               type="number"
               min={20}
               value={form.n_candidates}
               onChange={(e) => handleChange('n_candidates', Number(e.target.value))}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Consensus threshold τ
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Ensemble Jury Consensus (τ)
+            </label>
             <input
               type="number"
               step="0.01"
@@ -249,125 +296,305 @@ export default function DiscoveryPage() {
               max={1}
               value={form.tau}
               onChange={(e) => handleChange('tau', Number(e.target.value))}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="text-sm text-slate-300">
-            Top K results
+          <div>
+            <label className="text-xs font-mono uppercase tracking-wider text-slate-300 block mb-2">
+              Top-K Candidate Cutoff
+            </label>
             <input
               type="number"
               min={1}
               value={form.top_k}
               onChange={(e) => handleChange('top_k', Number(e.target.value))}
-              className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              className="w-full rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5 text-sm text-white font-mono focus:border-amber-400/50 focus:outline-none transition-colors"
             />
-          </label>
+          </div>
 
-          <label className="flex items-center gap-3 self-end rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={form.relax}
-              onChange={(e) => handleChange('relax', e.target.checked)}
-            />
-            Enable CHGNet relaxation
-          </label>
+          <div className="md:col-span-2">
+            <label className="flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] p-3.5 cursor-pointer hover:border-white/[0.14] transition-colors">
+              <input
+                type="checkbox"
+                checked={form.relax}
+                onChange={(e) => handleChange('relax', e.target.checked)}
+                className="h-4 w-4 rounded border-slate-700 text-amber-500 focus:ring-0"
+              />
+              <div>
+                <span className="text-sm font-medium text-slate-200">Enable CHGNet Structure Relaxation</span>
+                <p className="text-xs text-slate-400">Optimizes generated atomic coordinates using CHGNet StructOptimizer before thermodynamic filtering.</p>
+              </div>
+            </label>
+          </div>
         </div>
 
-        <div className="mt-6 flex items-center gap-3">
-          <button type="submit" disabled={status === 'Queued' || status.startsWith('Generating') || status === 'Submitting job...'} className="button-primary disabled:opacity-50">Run generation</button>
-          <button type="button" className="button-secondary" onClick={() => setForm(initialForm)}>
-            Reset Form
+        {/* Action Controls */}
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-white/[0.06] pt-6">
+          <button
+            type="submit"
+            disabled={isGenerating}
+            className="button-accent disabled:opacity-50 flex items-center gap-2"
+          >
+            {isGenerating ? (
+              <>
+                <div className="h-4 w-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                <span>Generating Candidates…</span>
+              </>
+            ) : (
+              <>
+                <Atom className="h-4 w-4" />
+                <span>Run Generation & Validation</span>
+              </>
+            )}
           </button>
+
+          <button
+            type="button"
+            className="button-secondary flex items-center gap-1.5"
+            onClick={() => setForm(initialForm)}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Reset Form</span>
+          </button>
+
           {(job || jobId) && (
             <button
               type="button"
-              className="button-secondary text-rose-300 hover:text-rose-200 border-rose-800/40 hover:bg-rose-950/30"
+              className="button-secondary text-rose-300 hover:text-rose-200 border-rose-500/20 hover:bg-rose-500/10 flex items-center gap-1.5"
               onClick={handleClear}
             >
-              Clear Results
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Clear Session</span>
             </button>
           )}
         </div>
 
-        <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/80 p-3 text-sm text-slate-300">
-          Status: <span className="text-indigo-200">{status}</span>
-          {jobId && <div className="mt-2 text-xs text-slate-400">Job ID: {jobId}</div>}
-          {job && <div className="mt-2 text-xs text-slate-400">Updated {new Date(job.updated_at * 1000).toLocaleTimeString()} · progress {Math.round((job.progress ?? 0) * 100)}%</div>}
+        {/* Execution Status Bar */}
+        <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-xs font-mono text-slate-300 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className={`h-2 w-2 rounded-full ${isGenerating ? 'bg-amber-400 animate-pulse-amber' : 'bg-emerald-400'}`} />
+            <span>Status: <strong className="text-white">{status}</strong></span>
+          </div>
+          {jobId && <span className="text-slate-400">Job ID: <span className="text-slate-200">{jobId}</span></span>}
+          {job?.progress != null && isGenerating && (
+            <div className="w-full bg-white/[0.06] h-1.5 rounded-full overflow-hidden mt-1">
+              <div
+                className="bg-amber-400 h-full transition-all duration-300"
+                style={{ width: `${Math.round((job.progress ?? 0) * 100)}%` }}
+              />
+            </div>
+          )}
         </div>
       </form>
 
-      {requestError && <p role="alert" className="break-all text-sm text-rose-300">{requestError}</p>}
-      {registrationStatus && <p role="status" className="break-all text-sm text-indigo-200">{registrationStatus}</p>}
+      {requestError && (
+        <div role="alert" className="card border-rose-500/30 bg-rose-500/[0.05] p-4 text-sm text-rose-300 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-rose-400 mt-0.5" />
+          <div className="font-mono break-all">{requestError}</div>
+        </div>
+      )}
+
+      {registrationStatus && (
+        <div role="status" className="card border-emerald-500/30 bg-emerald-500/[0.05] p-4 text-sm text-emerald-200 flex items-start gap-3">
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-400 mt-0.5" />
+          <div className="font-mono break-all">{registrationStatus}</div>
+        </div>
+      )}
+
+      {/* On-Chain Registration Prerequisites Checklist (Styled with Lucide icons instead of text symbols) */}
       {candidates.length > 0 && (
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-100">
-            <input type="checkbox" checked={storageConsent} onChange={(event) => setStorageConsent(event.target.checked)} className="mt-1" />
-            <span>Before registering, upload this structure and its metadata to configured storage. If that provider is public IPFS, uploaded content may be publicly retrievable and cannot be made confidential by this application. Do not upload confidential or restricted material data. With no IPFS provider configured, the backend uses its explicitly labelled local JSON fallback.</span>
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.04] p-4 text-xs text-amber-200/90 leading-relaxed cursor-pointer">
+            <input
+              type="checkbox"
+              checked={storageConsent}
+              onChange={(event) => setStorageConsent(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-amber-500/40 text-amber-500 focus:ring-0"
+            />
+            <span>
+              I understand that registration publishes this crystal structure and metadata to the configured storage provider. On public IPFS networks, uploaded data is publicly retrievable and immutable.
+            </span>
           </label>
-          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-sm">
-            <p className="font-medium text-slate-200 mb-2">To register on-chain, you need:</p>
-            <ol className="space-y-1 text-slate-400 list-decimal list-inside">
-              <li className={storageConsent ? 'text-emerald-300' : 'text-amber-300'}>
-                {storageConsent ? '✓ Storage consent given' : '✗ Check the consent box above'}
-              </li>
-              <li className={metamaskInstalled ? 'text-emerald-300' : 'text-rose-300'}>
-                {metamaskInstalled ? '✓ MetaMask detected' : '✗ MetaMask not detected — install the MetaMask browser extension'}
-              </li>
-              <li className={connected ? 'text-emerald-300' : 'text-slate-400'}>
-                {connected ? `✓ Wallet connected (${correctNetwork ? 'correct network' : 'wrong network — switch to chain 1337 in MetaMask'})` : '○ Click "Connect MetaMask" in the top bar, then switch to Ganache (chain 1337)'}
-              </li>
-            </ol>
+
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4 text-xs font-mono">
+            <div className="text-slate-300 font-medium mb-3 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-amber-300" />
+              <span>Cryptographic Registry Readiness</span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5">
+                {storageConsent ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                )}
+                <span className={storageConsent ? 'text-emerald-300' : 'text-amber-300'}>
+                  {storageConsent ? 'Storage consent confirmed' : 'Consent required above'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {metamaskInstalled ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                )}
+                <span className={metamaskInstalled ? 'text-emerald-300' : 'text-rose-300'}>
+                  {metamaskInstalled ? 'MetaMask extension detected' : 'MetaMask extension not detected'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {connected && correctNetwork ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                ) : connected ? (
+                  <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                ) : (
+                  <Clock className="h-4 w-4 text-slate-500 shrink-0" />
+                )}
+                <span className={connected && correctNetwork ? 'text-emerald-300' : connected ? 'text-amber-300' : 'text-slate-400'}>
+                  {connected
+                    ? `Wallet connected (${correctNetwork ? 'Ganache chain 1337 verified' : 'incorrect chain — switch in MetaMask'})`
+                    : 'Wallet disconnected — connect wallet via top navigation'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {diagnostics && <section className="card p-5">
-        <h2 className="text-lg font-semibold text-white">Actual pipeline diagnostics</h2>
-        <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-300">
-          <span>Generated: {diagnostics.generated}</span>
-          <span>Geometry valid: {diagnostics.geometry_valid}</span>
-          <span>Thermodynamic pass: {diagnostics.e_hull_passed}</span>
-          <span>Jury pass: {diagnostics.jury_passed}</span>
-          <span>Final validated: {diagnostics.final_validated}</span>
-          {job?.result?.elapsed != null && <span>Elapsed: {Number(job.result.elapsed).toFixed(2)} s</span>}
-        </div>
-        <p className="mt-3 text-xs text-amber-300">Model predictions and computed stability estimates are not experimental verification.</p>
-        {job?.result?.model_availability && <p className="mt-2 text-xs text-slate-400">Model availability: {Object.entries(job.result.model_availability).map(([name, available]) => `${name}: ${available ? 'available' : 'unavailable'}`).join(' · ')}</p>}
-      </section>}
+      {/* Actual Scientific Pipeline Diagnostics Breakdown */}
+      {diagnostics && (
+        <section className="card p-6">
+          <div className="mb-4 flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <h2 className="font-heading text-lg font-semibold text-white">Diagnostic Accounting</h2>
+            {job?.result?.elapsed != null && (
+              <span className="text-xs font-mono text-slate-400">
+                Elapsed: {Number(job.result.elapsed).toFixed(2)} s
+              </span>
+            )}
+          </div>
 
-      {job?.status === 'completed' && <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-white">Validated candidate results ({candidates.length})</h2>
-        {!candidates.length && <p className="card p-5 text-sm text-slate-400">The scientific pipeline completed but returned no candidates passing all validation stages.</p>}
-        <div className="grid gap-4 xl:grid-cols-2">
-          {candidates.map((candidate) => (
-            <article key={candidate.material_hash} className={`card p-5 ${selectedHash === candidate.material_hash ? 'ring-1 ring-emerald-400' : ''}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-semibold text-white">{candidate.formula}</h3>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-xs text-emerald-200">Scientifically pipeline-validated</span>
-              </div>
-              <dl className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-300">
-                <div><dt className="text-slate-500">Density</dt><dd>{Number(candidate.density).toFixed(3)} g/cm³</dd></div>
-                <div><dt className="text-slate-500">E above hull</dt><dd>{Number(candidate.e_hull).toFixed(4)} eV/atom</dd></div>
-                <div><dt className="text-slate-500">Predicted formation energy</dt><dd>{Number(candidate.predicted_formation_energy).toFixed(4)} eV/atom</dd></div>
-                <div><dt className="text-slate-500">Ensemble spread</dt><dd>{Number(candidate.consensus_spread).toFixed(4)}</dd></div>
-              </dl>
-              <p className="mt-3 break-all font-mono text-xs text-slate-500">Fingerprint: {candidate.material_hash}</p>
-              <p className="mt-2 text-xs text-slate-400">Model predictions: {Object.entries(candidate.model_predictions ?? {}).map(([name, value]) => `${name} ${value == null ? 'unavailable' : Number(value).toFixed(4)}`).join(' · ')}</p>
-              <details className="mt-3 text-xs text-slate-400"><summary className="cursor-pointer">View crystal structure data</summary><pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap">{JSON.stringify(candidate.structure_payload, null, 2)}</pre></details>
-              <button
-                type="button"
-                disabled={!registryConfigured || registeringHash === candidate.material_hash || selectedHash === candidate.material_hash}
-                onClick={() => void registerCandidate(candidate)}
-                className="button-primary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
-                title="Structure is uploaded to the configured storage provider before the wallet transaction. IPFS content may be public; do not register confidential structures."
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+            <div className="grid-panel">
+              <div className="text-[11px] font-mono text-slate-400">1. Sampled</div>
+              <div className="mt-1 font-heading text-xl font-semibold text-white">{diagnostics.generated}</div>
+            </div>
+            <div className="grid-panel">
+              <div className="text-[11px] font-mono text-slate-400">2. Geometry Valid</div>
+              <div className="mt-1 font-heading text-xl font-semibold text-emerald-300">{diagnostics.geometry_valid}</div>
+            </div>
+            <div className="grid-panel">
+              <div className="text-[11px] font-mono text-slate-400">3. Convex Hull Pass</div>
+              <div className="mt-1 font-heading text-xl font-semibold text-white">{diagnostics.e_hull_passed}</div>
+            </div>
+            <div className="grid-panel">
+              <div className="text-[11px] font-mono text-slate-400">4. Jury Consensus</div>
+              <div className="mt-1 font-heading text-xl font-semibold text-white">{diagnostics.jury_passed}</div>
+            </div>
+            <div className="grid-panel col-span-2 md:col-span-1">
+              <div className="text-[11px] font-mono text-slate-400">5. Final Validated</div>
+              <div className="mt-1 font-heading text-xl font-semibold text-amber-300">{diagnostics.final_validated}</div>
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs font-mono text-slate-400">
+            Computed stability estimates rely on surrogate model consensus and are not experimental verification.
+          </p>
+        </section>
+      )}
+
+      {/* Validated Candidate Results */}
+      {job?.status === 'completed' && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-xl font-semibold text-white">
+              Validated Candidate Discoveries ({candidates.length})
+            </h2>
+          </div>
+
+          {!candidates.length && (
+            <div className="card p-8 text-center text-sm font-mono text-slate-400">
+              The pipeline completed successfully, but zero candidates satisfied all geometric, convex-hull, and jury consensus criteria.
+            </div>
+          )}
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            {candidates.map((candidate) => (
+              <article
+                key={candidate.material_hash}
+                className={`card p-6 flex flex-col justify-between ${
+                  selectedHash === candidate.material_hash ? 'ring-1 ring-emerald-400 border-emerald-500/40' : ''
+                }`}
               >
-                {selectedHash === candidate.material_hash ? 'Registered on chain' : registeringHash === candidate.material_hash ? 'Waiting for MetaMask confirmation…' : 'Review and register with MetaMask'}
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>}
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+                    <h3 className="font-heading text-2xl font-bold tracking-tight text-white">{candidate.formula}</h3>
+                    <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-mono text-emerald-300">
+                      Consensus Validated
+                    </span>
+                  </div>
+
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="grid-panel p-2.5">
+                      <dt className="text-slate-400">Density</dt>
+                      <dd className="mt-1 text-sm font-semibold text-white">{Number(candidate.density).toFixed(3)} g/cm³</dd>
+                    </div>
+                    <div className="grid-panel p-2.5">
+                      <dt className="text-slate-400">E Above Hull</dt>
+                      <dd className="mt-1 text-sm font-semibold text-emerald-300">{Number(candidate.e_hull).toFixed(4)} eV/atom</dd>
+                    </div>
+                    <div className="grid-panel p-2.5">
+                      <dt className="text-slate-400">Formation Energy</dt>
+                      <dd className="mt-1 text-sm font-semibold text-white">{Number(candidate.predicted_formation_energy).toFixed(4)} eV/atom</dd>
+                    </div>
+                    <div className="grid-panel p-2.5">
+                      <dt className="text-slate-400">Ensemble Spread (τ)</dt>
+                      <dd className="mt-1 text-sm font-semibold text-amber-300">{Number(candidate.consensus_spread).toFixed(4)}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-4 rounded-lg bg-black/40 border border-white/[0.06] p-2.5 text-xs font-mono text-slate-400 break-all">
+                    <span className="text-slate-500 block text-[10px] uppercase">SHA-256 Crystal Fingerprint</span>
+                    {candidate.material_hash}
+                  </div>
+
+                  <details className="mt-3 text-xs text-slate-400 font-mono">
+                    <summary className="cursor-pointer hover:text-slate-200 transition-colors">
+                      View Raw Crystal Structure Payload
+                    </summary>
+                    <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-black/50 p-3 text-[11px] text-slate-300 border border-white/[0.04]">
+                      {JSON.stringify(candidate.structure_payload, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    !registryConfigured ||
+                    registeringHash === candidate.material_hash ||
+                    selectedHash === candidate.material_hash
+                  }
+                  onClick={() => void registerCandidate(candidate)}
+                  className={`mt-6 w-full ${
+                    selectedHash === candidate.material_hash
+                      ? 'button-secondary text-emerald-300 border-emerald-500/30 cursor-default'
+                      : 'button-primary'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                >
+                  {selectedHash === candidate.material_hash
+                    ? 'Registered on Ledger'
+                    : registeringHash === candidate.material_hash
+                    ? 'Awaiting MetaMask Confirmation…'
+                    : 'Register Structure on Blockchain'}
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

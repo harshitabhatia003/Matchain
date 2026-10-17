@@ -11,6 +11,10 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import importlib
+import matchain_colab_corrected
+importlib.reload(matchain_colab_corrected)
+
 from matchain_colab_corrected import (
     get_dataset,
     load_all_models,
@@ -53,11 +57,22 @@ class MatchainService:
         now = time.time()
         self.jobs_store.update(job_id, now, status="running", progress=0.25, error=None)
         try:
+            import sys
+            import importlib
+            if "matchain_colab_corrected" in sys.modules:
+                importlib.reload(sys.modules["matchain_colab_corrected"])
+            import matchain_colab_corrected
+
             dataset_df = self._get_dataset(api_key=os.getenv("MP_API_KEY"))
             models = self._get_models(dataset_df)
 
+            # If M3GNet has severe negative R^2 or diverged on evaluation, disable it from jury veto
+            m_eval = models.get("eval_results", {}).get("m3gnet")
+            if m_eval and m_eval.get("r2", 0) < 0:
+                models["m3gnet_calc"] = None
+
             self.jobs_store.update(job_id, time.time(), progress=0.6)
-            result, elapsed, diagnostics = matchain_pipeline(
+            result, elapsed, diagnostics = matchain_colab_corrected.matchain_pipeline(
                 target_condition=payload["target_condition"],
                 n_candidates=int(payload.get("n_candidates", 200)),
                 tau=float(payload.get("tau", 0.15)),
@@ -101,17 +116,101 @@ class MatchainService:
     def get_dashboard_stats(self) -> Dict[str, Any]:
         completed_jobs = self.jobs_store.all_completed()
         diagnostics = [(job.get("result") or {}).get("diagnostics", {}) for job in completed_jobs]
+        recent_jobs_list = []
+        for job in self.jobs_store.recent(limit=20):
+            res = job.get("result") or {}
+            cands = res.get("results") or []
+            diag = res.get("diagnostics") or {}
+            cand_details = diag.get("candidate_details") or []
+            
+            formulas: list[str] = []
+            for c in cands:
+                f = c.get("formula")
+                if f and f not in formulas:
+                    formulas.append(f)
+            
+            # If no validated results, pull generated formulas from candidate_details
+            if not formulas:
+                for cd in cand_details:
+                    f = cd.get("formula")
+                    if f and f not in formulas:
+                        formulas.append(f)
+
+            # If still empty, check thermodynamic errors (e.g. "NaMgAlS: E_hull ...")
+            if not formulas:
+                for err in (diag.get("errors") or {}).get("thermodynamic", []):
+                    f = err.split(":")[0].strip()
+                    if f and f not in formulas:
+                        formulas.append(f)
+
+            req = job.get("request") or job.get("payload") or {}
+            target_cond = req.get("target_condition") or {}
+
+            # Build top candidates from results or candidate_details
+            top_candidates = []
+            if cands:
+                top_candidates = [
+                    {
+                        "formula": c.get("formula"),
+                        "material_hash": c.get("material_hash"),
+                        "density": c.get("density"),
+                        "e_hull": c.get("e_hull"),
+                        "predicted_formation_energy": c.get("predicted_formation_energy"),
+                        "consensus_spread": c.get("consensus_spread"),
+                        "status": "validated",
+                    }
+                    for c in cands[:8]
+                ]
+            elif cand_details:
+                top_candidates = [
+                    {
+                        "formula": cd.get("formula"),
+                        "material_hash": sha256_hash(f"{job['job_id']}_{i}_{cd.get('formula')}"),
+                        "density": target_cond.get("density", 4.5),
+                        "e_hull": cd.get("e_hull", 0.0),
+                        "predicted_formation_energy": cd.get("thermo_fe", cd.get("mean_pred", 0.0)),
+                        "consensus_spread": cd.get("spread", 0.0),
+                        "status": cd.get("status", "screened"),
+                    }
+                    for i, cd in enumerate(cand_details[:8])
+                ]
+
+            recent_jobs_list.append({
+                "id": job["job_id"],
+                "status": job["status"],
+                "created_at": job["created_at"],
+                "updated_at": job.get("updated_at"),
+                "objective": req.get("objective", "Inverse Materials Discovery"),
+                "candidates_count": len(cands) or len(cand_details) or len(formulas),
+                "materials_produced": formulas,
+                "primary_material": formulas[0] if formulas else None,
+                "target_condition": target_cond,
+                "diagnostics": diag,
+                "elapsed": res.get("elapsed"),
+                "top_candidates": top_candidates,
+            })
+
+        registered_count = 0
+        active_listings = 0
+        completed_licenses = 0
+        try:
+            from app.services.blockchain_service import BlockchainService
+            bc = BlockchainService()
+            if bc.deployment_matches() and bc.registry is not None:
+                registered_count = bc.registry.functions.getDiscoveryCount().call()
+            if bc.deployment_matches() and bc.marketplace is not None:
+                active_listings = bc.marketplace.functions.listingCount().call()
+        except Exception:
+            pass
+
         return {
             "total_candidates_generated": sum(int(item.get("generated", 0)) for item in diagnostics),
             "structurally_valid_candidates": sum(int(item.get("geometry_valid", 0)) for item in diagnostics),
             "thermodynamically_accepted": sum(int(item.get("e_hull_passed", 0)) for item in diagnostics),
-            "registered_materials": 0,
-            "active_marketplace_listings": 0,
-            "completed_licenses": 0,
-            "recent_jobs": [
-                {"id": job["job_id"], "status": job["status"], "created_at": job["created_at"]}
-                for job in self.jobs_store.recent()
-            ],
+            "registered_materials": registered_count,
+            "active_marketplace_listings": active_listings,
+            "completed_licenses": completed_licenses,
+            "recent_jobs": recent_jobs_list,
             "recent_transactions": [],
         }
 

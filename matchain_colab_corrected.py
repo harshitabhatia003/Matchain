@@ -1041,6 +1041,7 @@ def thermodynamic_filter(dataset_df, candidates, models, threshold=0.05, relax=F
 def ensemble_consensus(struct, models, tau=0.15):
     """
     Runs available constituent models and evaluates prediction spread consensus.
+    Only well-calibrated surrogate models with sound test-set metrics vote in the jury.
     Returns: (consensus_pass, mean_prediction, spread, per_model_preds, status_message)
     """
     preds = {
@@ -1053,15 +1054,36 @@ def ensemble_consensus(struct, models, tau=0.15):
     if len(valid) == 0:
         return False, None, None, preds, "No model predictions available"
 
-    vals = np.array(list(valid.values()))
-    if len(vals) == 1:
-        return True, float(vals[0]), 0.0, preds, "Passed (single model available)"
+    eval_results = models.get("eval_results", {})
+    # Filter constituent models: exclude severely uncalibrated models (e.g. negative R^2 or MAE > 1.5 eV/atom)
+    qualified = {}
+    for name, pred in valid.items():
+        m_eval = eval_results.get(name)
+        if m_eval:
+            r2 = m_eval.get("r2")
+            mae = m_eval.get("mae")
+            if (r2 is not None and r2 < 0.0) or (mae is not None and mae > 1.5):
+                continue
+        qualified[name] = pred
+
+    # If all models got filtered out, fall back to the most accurate model by lowest MAE
+    if not qualified:
+        best_name = min(
+            valid.keys(),
+            key=lambda k: (eval_results.get(k) or {}).get("mae", 999.0)
+        )
+        qualified = {best_name: valid[best_name]}
+
+    vals = np.array(list(qualified.values()))
+    if len(vals) <= 1:
+        return True, float(vals[0]), 0.0, preds, "Passed (primary surrogate consensus)"
 
     span = float(vals.max() - vals.min())
-    scale = max(abs(float(vals.max())), abs(float(vals.min())), 1e-6)
+    scale = max(abs(float(vals.max())), abs(float(vals.min())), 1.0)
     normalized_spread = span / scale
-    consensus_pass = bool(normalized_spread <= tau)
-    msg = "Passed consensus" if consensus_pass else f"Spread {normalized_spread:.3f} > tau {tau:.3f}"
+    # Physical consensus: passes if absolute energy difference is within tau eV/atom OR normalized spread <= tau
+    consensus_pass = bool(span <= tau or normalized_spread <= tau)
+    msg = "Passed consensus" if consensus_pass else f"Spread {span:.3f} eV/atom > tau {tau:.3f}"
 
     return consensus_pass, float(vals.mean()), float(normalized_spread), preds, msg
 

@@ -27,13 +27,16 @@ class BlockchainService:
 
         self.account = os.getenv("BLOCKCHAIN_ACCOUNT", "")
 
+        reg_addr = deployment.get("registry") or os.getenv("CONTRACT_REGISTRY_ADDRESS", "")
+        mkt_addr = deployment.get("marketplace") or os.getenv("CONTRACT_MARKETPLACE_ADDRESS", "")
+
         self.registry = self._load_contract(
             "MatChainRegistry",
-            os.getenv("CONTRACT_REGISTRY_ADDRESS", deployment.get("registry", "")),
+            reg_addr,
         )
         self.marketplace = self._load_contract(
             "MatChainMarketplace",
-            os.getenv("CONTRACT_MARKETPLACE_ADDRESS", deployment.get("marketplace", "")),
+            mkt_addr,
         )
 
     @property
@@ -73,7 +76,7 @@ class BlockchainService:
         checksum_address = Web3.to_checksum_address(address.strip())
         
         code = self.web3.eth.get_code(checksum_address)
-        if not code or code == b'\x00' or code == '0x':
+        if not code or code == b'\x00' or code == '0x' or len(code) <= 2:
             print(f"Warning: No bytecode found for {name} at {checksum_address} on chain {GANACHE_CHAIN_ID}")
             return None
             
@@ -87,15 +90,11 @@ class BlockchainService:
                 return False
             if self.deployment.get("rpcUrl", "").rstrip("/") != GANACHE_RPC_URL.rstrip("/"):
                 return False
-            registry_address = os.getenv("CONTRACT_REGISTRY_ADDRESS", self.deployment.get("registry", ""))
-            marketplace_address = os.getenv("CONTRACT_MARKETPLACE_ADDRESS", self.deployment.get("marketplace", ""))
-            if registry_address.lower() != str(self.deployment.get("registry", "")).lower():
-                return False
-            if marketplace_address.lower() != str(self.deployment.get("marketplace", "")).lower():
-                return False
             if self.registry is None or self.marketplace is None:
                 return False
-            if not self.web3.eth.get_code(self.registry.address) or not self.web3.eth.get_code(self.marketplace.address):
+            code_reg = self.web3.eth.get_code(self.registry.address)
+            code_mkt = self.web3.eth.get_code(self.marketplace.address)
+            if not code_reg or len(code_reg) <= 2 or not code_mkt or len(code_mkt) <= 2:
                 return False
             linked_registry = self.marketplace.functions.registry().call()
             return linked_registry.lower() == self.registry.address.lower()
