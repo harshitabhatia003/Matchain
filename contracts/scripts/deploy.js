@@ -44,15 +44,23 @@ async function main() {
 
   if (networkName === 'localhost' || networkName === 'ganache') {
     const frontendEnv = path.join(__dirname, '..', '..', 'frontend', '.env.local');
-    fs.writeFileSync(frontendEnv, [
-      `VITE_CHAIN_ID=${deployment.chainId}`,
-      `VITE_CHAIN_NAME=${networkName === 'ganache' ? 'Ganache Local' : 'Local EVM'}`,
-      `VITE_GANACHE_RPC_URL=${deployment.rpcUrl}`,
-      `VITE_CONTRACT_REGISTRY_ADDRESS=${deployment.registry}`,
-      `VITE_CONTRACT_MARKETPLACE_ADDRESS=${deployment.marketplace}`,
-      'VITE_API_URL=http://localhost:8000',
-      '',
-    ].join('\n'));
+    let existingFrontendEnv = fs.existsSync(frontendEnv) ? fs.readFileSync(frontendEnv, 'utf8') : '';
+    const frontendUpdates = {
+      VITE_CHAIN_ID: String(deployment.chainId),
+      VITE_CHAIN_NAME: networkName === 'ganache' ? 'Ganache Local' : 'Local EVM',
+      VITE_GANACHE_RPC_URL: deployment.rpcUrl,
+      VITE_CONTRACT_REGISTRY_ADDRESS: deployment.registry,
+      VITE_CONTRACT_MARKETPLACE_ADDRESS: deployment.marketplace,
+      VITE_API_URL: 'http://localhost:8000',
+    };
+    for (const [key, value] of Object.entries(frontendUpdates)) {
+      const line = `${key}=${value}`;
+      const expression = new RegExp(`^${key}=.*$`, 'm');
+      existingFrontendEnv = expression.test(existingFrontendEnv)
+        ? existingFrontendEnv.replace(expression, line)
+        : `${existingFrontendEnv.trimEnd()}${existingFrontendEnv ? '\n' : ''}${line}\n`;
+    }
+    fs.writeFileSync(frontendEnv, existingFrontendEnv);
     console.log('Updated frontend/.env.local for the persistent local network. Restart Vite to load it.');
     if (network.chainId === 1337n) {
       const backendEnvPath = path.join(__dirname, '..', '..', '.env');
