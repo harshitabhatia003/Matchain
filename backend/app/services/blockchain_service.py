@@ -253,6 +253,34 @@ class BlockchainService:
             
         return {"material_hash": Web3.to_hex(digest), "price_wei": record[3], **receipt}
 
+    def is_verified_purchaser(self, material_hash: str, wallet_address: str) -> bool:
+        """Verifies on-chain that the given wallet_address purchased the listing for material_hash."""
+        if not wallet_address:
+            return False
+        if not self.deployment_matches() or self.marketplace is None:
+            return False
+        try:
+            digest = self.fingerprint(material_hash)
+            listing = self.marketplace.functions.listings(digest).call()
+            is_sold = bool(listing[5])
+            buyer_address = listing[2]
+            return is_sold and (buyer_address.lower() == wallet_address.strip().lower())
+        except Exception:
+            return False
+
+    def get_material_creator(self, material_hash: str) -> Optional[str]:
+        if not self.deployment_matches() or self.registry is None:
+            return None
+        try:
+            digest = self.fingerprint(material_hash)
+            record = self.registry.functions.discoveries(digest).call()
+            creator = record[1]
+            if creator and creator != "0x0000000000000000000000000000000000000000":
+                return creator
+            return None
+        except Exception:
+            return None
+
     def get_recent_events(self, limit: int = 10) -> list[dict[str, Any]]:
         if not self.deployment_matches():
             return []

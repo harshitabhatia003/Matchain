@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Wrench, CheckCircle2, XCircle, AlertTriangle, Cpu, Terminal, Key, ExternalLink } from 'lucide-react';
+import { Wrench, CheckCircle2, XCircle, AlertTriangle, Cpu, Terminal, Key, ExternalLink, HardDrive } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { fetchJson } from '../lib/api';
+import type { IpfsStatus } from '../types';
 
 type Health = {
   status: string;
@@ -19,11 +21,13 @@ type Analytics = {
 
 export default function SettingsPage() {
   const [health, setHealth] = useState<Health | null>(null);
+  const [ipfsStatus, setIpfsStatus] = useState<IpfsStatus | null>(null);
   const [modelAvailability, setModelAvailability] = useState<Record<string, boolean> | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     fetchJson<Health>('/api/health').then(setHealth).catch((reason: Error) => setError(reason.message));
+    fetchJson<IpfsStatus>('/api/storage/status').then(setIpfsStatus).catch(() => setIpfsStatus(null));
     fetchJson<Analytics>('/api/analytics').then((data) => setModelAvailability(data.model_availability)).catch(() => setModelAvailability(null));
   }, []);
 
@@ -131,6 +135,60 @@ export default function SettingsPage() {
 
           <div className="mt-6 pt-4 border-t border-white/[0.06] text-[11px] font-mono text-slate-400">
             CHGNet & M3GNet evaluate potential energy surfaces; XGBoost provides Magpie composition feature predictions.
+          </div>
+        </div>
+
+        {/* IPFS Node Infrastructure Card */}
+        <div className="card p-6 md:col-span-2">
+          <div className="mb-4 flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <div className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-amber-300" />
+              <h2 className="font-heading text-base font-semibold text-white">IPFS Kubo Storage Node Configuration</h2>
+            </div>
+            <Link to="/storage" className="btn-overworld text-xs py-1 px-3 flex items-center gap-1.5 text-amber-300">
+              <span>Open IPFS Hub</span>
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-3 text-xs font-mono text-slate-300">
+              <p className="leading-relaxed text-slate-400">
+                MatChain distributes validated crystal payloads, CIF structures, and candidate metadata across the decentralized InterPlanetary File System. Content is content-addressed by cryptographic CIDv1 identifiers.
+              </p>
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center py-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400">Daemon RPC API:</span>
+                  <code className="text-amber-200">{ipfsStatus?.api_url || 'http://127.0.0.1:5001'}</code>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400">Local Gateway:</span>
+                  <code className="text-cyan-200">{ipfsStatus?.gateway_url || 'http://127.0.0.1:8080/ipfs'}</code>
+                </div>
+                <div className="flex justify-between items-center py-1 border-b border-white/[0.04]">
+                  <span className="text-slate-400">Kubo Daemon Status:</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] ${
+                    ipfsStatus?.online
+                      ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/25'
+                      : 'bg-amber-500/10 text-amber-300 border border-amber-500/25'
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${ipfsStatus?.online ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                    {ipfsStatus?.online ? `Connected (${ipfsStatus.peers_count} peers)` : 'Offline (Local Cache Active)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border border-white/[0.08] bg-black/50 p-3 text-xs font-mono">
+                <span className="text-[10px] uppercase text-slate-500 block mb-1">Start Local Kubo Daemon</span>
+                <code className="text-amber-200 text-xs block">ipfs daemon</code>
+                <span className="text-[10px] text-slate-500 block mt-1">Run in any PowerShell or bash prompt to initialize local pinning.</span>
+              </div>
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 text-[11px] font-mono text-slate-400">
+                Public Gateway Fallbacks: <span className="text-slate-300">ipfs.io · dweb.link · cloudflare-ipfs.com</span>
+              </div>
+            </div>
           </div>
         </div>
 

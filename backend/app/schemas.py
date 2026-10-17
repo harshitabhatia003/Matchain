@@ -40,5 +40,18 @@ class RegistryCreate(BaseModel):
 
 class StorageUpload(BaseModel):
     content: Dict[str, Any]
+    material_hash: Optional[str] = None
+    is_confidential: bool = False
 
 
+class FileUploadPayload(BaseModel):
+    filename: str
+    content_text: Optional[str] = None
+    content_base64: Optional[str] = None
+    content_type: str = "application/octet-stream"
+    material_hash: Optional[str] = None
+    is_confidential: bool = True
+
+
+class StoragePinRequest(BaseModel):
+    cid: str

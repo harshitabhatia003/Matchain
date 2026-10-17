@@ -89,3 +89,41 @@ export type Material = {
   };
   status: string;
 };
+
+export type IpfsStatus = {
+  online: boolean;
+  provider: string;
+  api_url: string;
+  gateway_url: string;
+  version: string | null;
+  peer_id: string | null;
+  peers_count: number;
+  repo_size_bytes: number;
+  stored_items_count: number;
+  mode: string;
+  public_gateways: string[];
+  error?: string | null;
+};
+
+export type IpfsShareBundle = {
+  cid: string;
+  ipfs_uri: string;
+  primary_share_url: string;
+  gateways: Record<string, string>;
+  markdown_link: string;
+  html_embed: string;
+  direct_download_url: string;
+};
+
+export type IpfsStoredItem = {
+  cid: string;
+  formula: string;
+  material_hash?: string;
+  is_file: boolean;
+  filename?: string;
+  size_bytes: number;
+  share_url: string;
+  local_gateway: string;
+  ipfs_uri: string;
+};
+

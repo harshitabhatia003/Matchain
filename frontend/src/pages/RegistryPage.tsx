@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Blocks, CheckCircle2, ShieldCheck, AlertTriangle, ArrowRight, Database, Hash } from 'lucide-react';
+import { Blocks, CheckCircle2, ShieldCheck, AlertTriangle, ArrowRight, Database, Hash, Share2, ExternalLink } from 'lucide-react';
 import { postJson } from '../lib/api';
 import { createRpcProvider, readRegistry, registerMaterial as registerOnchain, registryConfigured, shortHash } from '../services/contractClient';
 import { useWallet } from '../services/wallet';
+import IpfsShareModal from '../components/IpfsShareModal';
 
 type RegistryEntry = {
   fingerprint?: string;
@@ -24,6 +25,8 @@ export default function RegistryPage() {
   const [transaction, setTransaction] = useState('');
   const [storageBackend, setStorageBackend] = useState('');
   const [storageConsent, setStorageConsent] = useState(false);
+  const [shareCid, setShareCid] = useState<string | null>(null);
+  const [shareFormula, setShareFormula] = useState<string | undefined>(undefined);
   const { connected, correctNetwork, connect, getSigner, address } = useWallet();
 
   const refresh = async () => setEntries(await readRegistry(createRpcProvider()));
@@ -185,10 +188,50 @@ export default function RegistryPage() {
                       </div>
                     )}
                   </td>
-                  <td className="py-3.5 text-slate-400 max-w-[200px] truncate" title={entry.ipfs_cid}>
-                    {entry.ipfs_cid?.startsWith('local-sha256:')
-                      ? 'Local fallback store'
-                      : entry.ipfs_cid || 'None'}
+                  <td className="py-3.5">
+                    {(() => {
+                      const isCreator = Boolean(address && entry.creator && entry.creator.toLowerCase() === address.toLowerCase());
+                      const isMasked = !entry.ipfs_cid || entry.ipfs_cid.includes('[RESTRICTED');
+                      if (isCreator && entry.ipfs_cid && !isMasked) {
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShareCid(entry.ipfs_cid || null);
+                                setShareFormula(formulaFor(entry));
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-amber-400/30 text-amber-300 transition"
+                              title="View IPFS Gateways & Share"
+                            >
+                              <Share2 className="h-2.5 w-2.5 text-amber-400" />
+                              <span>
+                                {entry.ipfs_cid.startsWith('local-sha256:')
+                                  ? 'Local cache'
+                                  : `${entry.ipfs_cid.slice(0, 8)}…${entry.ipfs_cid.slice(-6)}`}
+                              </span>
+                            </button>
+                            {!entry.ipfs_cid.startsWith('local-sha256:') && (
+                              <a
+                                href={`https://ipfs.io/ipfs/${entry.ipfs_cid}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-slate-500 hover:text-white p-0.5"
+                                title="Open in IPFS Gateway"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono bg-slate-800/80 border border-slate-700/60 text-slate-400" title="Private storage reference. Access restricted to creator and licensed buyers.">
+                          <ShieldCheck className="h-3 w-3 text-amber-400/70" />
+                          <span>Protected (Creator Only)</span>
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="py-3.5 text-right">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[10px] text-emerald-300">
@@ -209,6 +252,13 @@ export default function RegistryPage() {
           </table>
         </div>
       </div>
+
+      <IpfsShareModal
+        cid={shareCid}
+        formula={shareFormula}
+        isOpen={Boolean(shareCid)}
+        onClose={() => setShareCid(null)}
+      />
     </div>
   );
 }

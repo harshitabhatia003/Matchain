@@ -35,8 +35,10 @@ def test_discovery_service_persists_completed_results_and_material_views(tmp_pat
     structure = Structure(Lattice.cubic(4), ["Si"], [[0, 0, 0]])
     service._get_dataset = lambda api_key=None: object()
     service._get_models = lambda dataset: {"model_availability": {"xgboost": True}}
+    monkeypatch.setattr("importlib.reload", lambda m: m)
+    import matchain_colab_corrected
     monkeypatch.setattr(
-        service_module,
+        matchain_colab_corrected,
         "matchain_pipeline",
         lambda **kwargs: ([{"structure": structure, "e_hull": 0.01, "consensus_spread": 0.02}], 0.5, {"generated": 4}),
     )
@@ -90,3 +92,36 @@ def test_storage_uses_configured_ipfs_api(monkeypatch: pytest.MonkeyPatch):
     assert result == {"storage_reference": "bafy-test-cid", "storage_backend": "ipfs", "is_ipfs": True}
     assert calls["url"] == "http://ipfs.test:5001/api/v0/add"
     assert calls["kwargs"]["headers"]["Authorization"] == "Bearer test-token"
+
+
+def test_storage_service_upload_file_and_get_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import app.services.storage_service as module
+    from app.services.storage_service import compute_cidv1_raw_sha256
+
+    target = tmp_path / "content.json"
+    monkeypatch.setattr(module, "LOCAL_STORE_PATH", target)
+    monkeypatch.setenv("IPFS_API_URL", "")
+
+    sample_cif = "data_test\n_cell_length_a 4.0\n_cell_length_b 4.0\n_cell_length_c 4.0"
+    svc = StorageService()
+    res = svc.upload_file("crystal.cif", sample_cif.encode("utf-8"), "chemical/x-cif")
+
+    assert res["filename"] == "crystal.cif"
+    assert res["cid"].startswith("bafkrei")
+    assert res["ipfs_uri"] == f"ipfs://{res['cid']}"
+    assert "https://ipfs.io/ipfs/" in res["share_url"]
+
+    retrieved = svc.get_content(res["cid"])
+    assert retrieved["filename"] == "crystal.cif"
+    assert retrieved["raw_text"] == sample_cif
+
+    bundle = svc.get_share_bundle(res["cid"])
+    assert bundle["cid"] == res["cid"]
+    assert "ipfs://" in bundle["ipfs_uri"]
+    assert "ipfs.io" in bundle["primary_share_url"]
+
+
+def test_cidv1_computation_standard_format():
+    from app.services.storage_service import compute_cidv1_raw_sha256
+    cid = compute_cidv1_raw_sha256(b"hello world\n")
+    assert cid.startswith("bafkrei")

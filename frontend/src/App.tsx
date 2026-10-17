@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useWalletState } from './services/wallet';
 import { useAuth } from './context/AuthContext';
+import { setApiAuth } from './lib/api';
 import ProtectedRoute from './components/ProtectedRoute';
 import EditProfileModal from './components/EditProfileModal';
 
@@ -21,6 +22,7 @@ const DiscoveryPage = lazy(() => import('./pages/DiscoveryPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage'));
 const RegistryPage = lazy(() => import('./pages/RegistryPage'));
+const StoragePage = lazy(() => import('./pages/StoragePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 
@@ -28,6 +30,7 @@ const AuthPage = lazy(() => import('./pages/AuthPage'));
 const navLinks = [
   { to: '/', label: 'Overview' },
   { to: '/discovery', label: 'Discovery' },
+  { to: '/storage', label: 'IPFS Hub' },
   { to: '/marketplace', label: 'Marketplace' },
   { to: '/registry', label: 'Registry' },
   { to: '/dashboard', label: 'Dashboard' },
@@ -47,8 +50,10 @@ export default function App() {
   const isConnecting = wallet?.connecting ?? false;
   const walletError = wallet?.error ?? '';
 
-  // Auto-sync connected MetaMask wallet address to Firestore user profile
+  // Auto-sync connected MetaMask wallet address to Firestore user profile and API client
   useEffect(() => {
+    const activeAddr = address || userProfile?.walletAddress || null;
+    setApiAuth(activeAddr);
     if (user && connected && address) {
       if (userProfile && userProfile.walletAddress !== address) {
         void linkWalletAddress(address);
@@ -296,6 +301,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <RegistryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/storage"
+                  element={
+                    <ProtectedRoute>
+                      <StoragePage />
                     </ProtectedRoute>
                   }
                 />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ShoppingBag, Tag, ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, Wallet, UserCheck } from 'lucide-react';
 import { createListing as sendListing, createRpcProvider, marketplaceConfigured, purchaseListing as sendPurchase, readMarketplace, readRegistry, shortHash } from '../services/contractClient';
 import { useWallet } from '../services/wallet';
+import { downloadAuthorizedFile } from '../lib/api';
 
 type Listing = { material_hash: string; price_eth: string; license: string; sold: boolean; seller: string; buyer: string };
 type RegisteredMaterial = { fingerprint: string; metadata: string; block_number: number; creator: string };
@@ -221,13 +222,34 @@ export default function MarketplacePage() {
               </div>
             </div>
 
-            <button
-              disabled={item.sold || busyHash === item.material_hash || !marketplaceConfigured}
-              onClick={() => purchase(item.material_hash)}
-              className={`mt-6 w-full ${item.sold ? 'button-secondary opacity-60 cursor-default' : 'button-accent'} disabled:cursor-not-allowed disabled:opacity-50`}
-            >
-              {item.sold ? 'License Executed' : busyHash === item.material_hash ? 'Confirming in Wallet…' : 'Acquire License with MetaMask'}
-            </button>
+            {item.sold && item.buyer.toLowerCase() === address?.toLowerCase() ? (
+              <button
+                disabled={busyHash === item.material_hash}
+                onClick={async () => {
+                  setBusyHash(item.material_hash);
+                  try {
+                    await downloadAuthorizedFile(`/api/storage/download/${item.material_hash}`, `material_${item.material_hash.slice(2, 10)}.cif`);
+                    setNotice(`Material file decrypted and downloaded successfully under your verified license.`);
+                  } catch (err: any) {
+                    setNotice(`Download failed: ${err.message}`);
+                  } finally {
+                    setBusyHash(null);
+                  }
+                }}
+                className="mt-6 w-full button-primary flex items-center justify-center gap-2 border-emerald-500/30 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>{busyHash === item.material_hash ? 'Decrypting File…' : 'Authorized Download (License Verified)'}</span>
+              </button>
+            ) : (
+              <button
+                disabled={item.sold || busyHash === item.material_hash || !marketplaceConfigured}
+                onClick={() => purchase(item.material_hash)}
+                className={`mt-6 w-full ${item.sold ? 'button-secondary opacity-60 cursor-default' : 'button-accent'} disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {item.sold ? 'License Executed' : busyHash === item.material_hash ? 'Confirming in Wallet…' : 'Acquire License with MetaMask'}
+              </button>
+            )}
           </div>
         ))}
 
