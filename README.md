@@ -290,7 +290,7 @@ To run the complete platform, open **4 separate PowerShell terminal windows**.
 
 | Service | Working Directory | Command | URL |
 | :--- | :--- | :--- | :--- |
-| **Local Blockchain (Ganache)** | `contracts` | `npm run node` | `http://127.0.0.1:8545` (or `7545`) |
+| **Local Blockchain (Ganache)** | `contracts` | `npm run node` | `http://127.0.0.1:8545` |
 | **FastAPI Backend** | `backend` | `python -m uvicorn app.main:app --reload` | `http://127.0.0.1:8000` |
 | **API Documentation (Swagger)** | — | — | `http://127.0.0.1:8000/docs` |
 | **React Frontend (Vite)** | `frontend` | `npm run dev` | `http://127.0.0.1:5173` |
@@ -366,7 +366,7 @@ To interact with on-chain material registration and marketplace licensing:
 
 1. Open MetaMask in your browser and click on the **Network selector** (top-left) > **Add a network** > **Add a network manually**:
    - **Network Name**: `Ganache Local`
-   - **New RPC URL**: `http://127.0.0.1:8545` *(or `http://127.0.0.1:7545` depending on your Ganache port)*
+   - **New RPC URL**: `http://127.0.0.1:8545`
    - **Chain ID**: `1337`
    - **Currency Symbol**: `ETH`
 2. Save and switch to the `Ganache Local` network.
@@ -523,7 +523,7 @@ npm test
 
 ### 4. MetaMask "Wrong Network" or Transaction Rejection
 - **Cause**: MetaMask is connected to Ethereum Mainnet or a different testnet instead of Ganache.
-- **Solution**: Switch MetaMask to `Ganache Local` (`http://127.0.0.1:7545`, Chain ID `1337`). If you restarted Ganache, reset your account nonce in MetaMask: **Settings > Advanced > Clear activity tab data**.
+- **Solution**: Switch MetaMask to `Ganache Local` (`http://127.0.0.1:8545`, Chain ID `1337`). If you restarted Ganache, reset your account nonce in MetaMask: **Settings > Advanced > Clear activity tab data**.
 
 ### 5. IPFS Status Shows "Offline (Cache Mode)"
 - **Cause**: The local Kubo daemon is not running on port 5001.
