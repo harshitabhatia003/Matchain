@@ -531,6 +531,17 @@ class StorageService:
                 }
 
         # If not confidential or legacy item in local store / IPFS:
+        cached_filename = None
+        with _local_store_lock:
+            if LOCAL_STORE_PATH.exists():
+                try:
+                    store = json.loads(LOCAL_STORE_PATH.read_text(encoding="utf-8"))
+                    ci = store.get(clean_cid)
+                    if isinstance(ci, dict):
+                        cached_filename = ci.get("filename")
+                except Exception:
+                    pass
+
         # 1. Try local Kubo daemon cat
         target_api = self._get_api_endpoint() if self.provider_configured else "http://127.0.0.1:5001/api/v0"
         try:
@@ -539,7 +550,7 @@ class StorageService:
                 raw_bytes = res.content
                 try:
                     parsed_json = json.loads(raw_bytes.decode("utf-8"))
-                    return {
+                    ret_obj = {
                         "cid": clean_cid,
                         "data": parsed_json,
                         "is_json": True,
@@ -548,8 +559,11 @@ class StorageService:
                         "source": "ipfs_kubo",
                         "share_bundle": self.get_share_bundle(clean_cid),
                     }
+                    if cached_filename:
+                        ret_obj["filename"] = cached_filename
+                    return ret_obj
                 except (UnicodeDecodeError, json.JSONDecodeError):
-                    return {
+                    ret_obj = {
                         "cid": clean_cid,
                         "data": raw_bytes.decode("utf-8", errors="replace"),
                         "is_json": False,
@@ -558,6 +572,9 @@ class StorageService:
                         "source": "ipfs_kubo",
                         "share_bundle": self.get_share_bundle(clean_cid),
                     }
+                    if cached_filename:
+                        ret_obj["filename"] = cached_filename
+                    return ret_obj
         except Exception:
             pass
 

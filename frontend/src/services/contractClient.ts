@@ -54,12 +54,15 @@ export function fingerprintOf(value: string): string {
 
 /**
  * Creates a read-only JSON-RPC provider for the configured Ganache node.
- * Wallet transactions should still use the user's signer.
+ * Uses staticNetwork to prevent ethers v6 from retrying endlessly when
+ * the node is not running (avoids the "retry in 1s" spam in console).
+ * Wallet transactions should still use the user's signer (MetaMask).
  */
 export function createRpcProvider(): JsonRpcProvider {
   return new JsonRpcProvider(
     networkConfig.rpcUrl,
-    networkConfig.chainId,
+    { chainId: networkConfig.chainId, name: networkConfig.chainName },
+    { staticNetwork: true, polling: false },
   );
 }
 
@@ -345,6 +348,54 @@ export async function registerMaterial(
     fingerprint,
     event: result.event,
   };
+}
+
+/** Stake the protocol amount and attest a registered material from the connected wallet. */
+export async function attestMaterial(signer: Signer, materialHash: string) {
+  if (!registryConfigured) throw new Error('Registry contract address is not configured.');
+  const provider = signer.provider;
+  if (!provider) throw new Error('Signer has no provider.');
+  await assertContract(provider, networkConfig.registryAddress, 'registry');
+  const contract = new Contract(getAddress(networkConfig.registryAddress), registryAbi, signer);
+  const fingerprint = fingerprintOf(materialHash);
+  const tx = await contract.verifyDiscovery(fingerprint, { value: parseEther('0.05') });
+  const result = await verifyTransaction(tx, {
+    contractAddress: getAddress(networkConfig.registryAddress),
+    abi: registryAbi,
+    eventName: 'DiscoveryVerified',
+    validateArgs: (args) => String(args.fingerprint).toLowerCase() === fingerprint.toLowerCase() && args.verified === true,
+    checkState: async (c) => (await c.discoveries(fingerprint)).verified,
+  }, provider);
+  if (!result.success) throw new Error(result.error || 'Validation transaction could not be verified.');
+  return { transactionHash: tx.hash, blockNumber: result.blockNumber, validator: await signer.getAddress() };
+}
+
+export async function readValidatorStake(provider: Provider, walletAddress: string): Promise<string> {
+  if (!registryConfigured || !isAddress(walletAddress)) return '0';
+  await assertContract(provider, networkConfig.registryAddress, 'registry');
+  const contract = new Contract(getAddress(networkConfig.registryAddress), registryAbi, provider);
+  return formatEther(await contract.validatorStake(getAddress(walletAddress)));
+}
+
+export async function withdrawValidatorStake(signer: Signer) {
+  if (!registryConfigured) throw new Error('Registry contract address is not configured.');
+  const provider = signer.provider;
+  if (!provider) throw new Error('Signer has no provider.');
+  await assertContract(provider, networkConfig.registryAddress, 'registry');
+  const contract = new Contract(getAddress(networkConfig.registryAddress), registryAbi, signer);
+  const walletAddress = await signer.getAddress();
+  const amount = await contract.validatorStake(walletAddress);
+  if (amount === 0n) throw new Error('This wallet has no validator stake to withdraw.');
+  const tx = await contract.withdrawStake();
+  const result = await verifyTransaction(tx, {
+    contractAddress: getAddress(networkConfig.registryAddress),
+    abi: registryAbi,
+    eventName: 'StakeWithdrawn',
+    validateArgs: (args) => String(args.validator).toLowerCase() === walletAddress.toLowerCase() && BigInt(args.amount) === amount,
+    checkState: async (c) => (await c.validatorStake(walletAddress)) === 0n,
+  }, provider);
+  if (!result.success) throw new Error(result.error || 'Stake withdrawal could not be verified.');
+  return { amount: formatEther(amount), transactionHash: tx.hash, blockNumber: result.blockNumber };
 }
 
 /**

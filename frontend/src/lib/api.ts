@@ -89,3 +89,81 @@ export async function downloadAuthorizedFile(url: string, fallbackFilename: stri
   a.remove();
   window.URL.revokeObjectURL(downloadUrl);
 }
+
+export async function fetchAuthorizedCif(materialHash: string): Promise<string> {
+  const result = await fetchJson<{ raw_text?: string }>(`/api/storage/content/${encodeURIComponent(materialHash)}`);
+  if (!result.raw_text || !result.raw_text.toLowerCase().includes('_atom_site_fract_x')) {
+    throw new Error('The licensed material record does not contain a readable CIF structure.');
+  }
+  return result.raw_text;
+}
+
+export interface AuditReport {
+  material_hash: string;
+  formula: string;
+  density: number;
+  e_hull: number;
+  predicted_formation_energy: number;
+  consensus_spread: number;
+  e_hull_passed: boolean;
+  e_hull_status: string;
+  distance_passed: boolean;
+  distance_status: string;
+  consensus_passed: boolean;
+  consensus_status: string;
+  overall_score: number;
+  tier: string;
+  recommendation: string;
+  timestamp: number;
+}
+
+export interface MarketplaceStats {
+  active_listings: number;
+  completed_licenses: number;
+  total_volume_eth: number;
+  verified_materials: number;
+  staked_validators_active: number;
+  validator_pool_rewards_eth: number;
+  dispute_window_hours: number;
+}
+
+export async function auditMarketplaceMaterial(materialHash: string): Promise<AuditReport> {
+  return postJson<AuditReport>('/api/marketplace/audit', { material_hash: materialHash });
+}
+
+export async function validateMarketplaceMaterial(
+  materialHash: string,
+  transactionHash: string,
+  score: number = 0.95
+): Promise<{ status: string; validation: any; onchain_verified: boolean; validator_reward_earned_eth: number }> {
+  return postJson('/api/marketplace/validate', {
+    material_hash: materialHash,
+    transaction_hash: transactionHash,
+    score,
+  });
+}
+
+export async function fetchMarketplaceStats(): Promise<MarketplaceStats> {
+  return fetchJson<MarketplaceStats>('/api/marketplace/stats');
+}
+
+export async function fetchMarketplaceListings(): Promise<any[]> {
+  return fetchJson<any[]>('/api/marketplace/listings');
+}
+
+export interface BackendMaterial {
+  id: string;
+  material_hash: string;
+  job_id: string;
+  formula: string;
+  density: number;
+  e_hull: number;
+  predicted_formation_energy: number;
+  consensus_spread: number;
+  status: string;
+  composition?: Record<string, number>;
+}
+
+export async function fetchBackendMaterials(): Promise<BackendMaterial[]> {
+  return fetchJson<BackendMaterial[]>('/api/materials');
+}

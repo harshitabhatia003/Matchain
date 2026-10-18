@@ -41,15 +41,16 @@ class MatchainService:
             self._models_cache = load_all_models(dataset_df)
         return self._models_cache
 
-    def create_job(self, payload: Dict[str, Any]) -> str:
+    def create_job(self, payload: Dict[str, Any], owner_wallet: str | None = None) -> str:
         job_id = uuid.uuid4().hex
         now = time.time()
-        self.jobs_store.create(job_id, payload, now)
+        self.jobs_store.create(job_id, payload, now, owner_wallet)
         return job_id
 
-    def get_job(self, job_id: str) -> Dict[str, Any]:
+    def get_job(self, job_id: str, owner_wallet: str | None = None) -> Dict[str, Any]:
         job = self.jobs_store.get(job_id)
-        if not job:
+        stored_owner = (job or {}).get("owner_wallet")
+        if not job or (stored_owner or "").lower() != (owner_wallet or "").lower():
             raise KeyError(f"Unknown job id: {job_id}")
         return job
 
@@ -113,11 +114,11 @@ class MatchainService:
         except Exception as exc:  # Keep failures queryable across backend restarts.
             self.jobs_store.update(job_id, time.time(), status="failed", error=str(exc))
 
-    def get_dashboard_stats(self) -> Dict[str, Any]:
-        completed_jobs = self.jobs_store.all_completed()
+    def get_dashboard_stats(self, owner_wallet: str | None = None) -> Dict[str, Any]:
+        completed_jobs = self.jobs_store.all_completed(owner_wallet)
         diagnostics = [(job.get("result") or {}).get("diagnostics", {}) for job in completed_jobs]
         recent_jobs_list = []
-        for job in self.jobs_store.recent(limit=20):
+        for job in self.jobs_store.recent(limit=20, owner_wallet=owner_wallet):
             res = job.get("result") or {}
             cands = res.get("results") or []
             diag = res.get("diagnostics") or {}
@@ -214,8 +215,8 @@ class MatchainService:
             "recent_transactions": [],
         }
 
-    def get_analytics(self) -> Dict[str, Any]:
-        recent_jobs = self.jobs_store.recent(limit=50)
+    def get_analytics(self, owner_wallet: str | None = None) -> Dict[str, Any]:
+        recent_jobs = self.jobs_store.recent(limit=50, owner_wallet=owner_wallet)
         completed = next((job for job in recent_jobs if job["status"] == "completed" and job.get("result")), None)
         if completed is None:
             return {"job_id": None, "model_availability": {}, "model_evaluation": {}, "vae_history": {"epochs": [], "total_loss": []}}
@@ -227,11 +228,11 @@ class MatchainService:
             "vae_history": result.get("vae_history", {"epochs": [], "total_loss": []}),
         }
 
-    def get_materials(self) -> List[Dict[str, Any]]:
+    def get_materials(self, owner_wallet: str | None = None) -> List[Dict[str, Any]]:
         from pymatgen.core import Structure
 
         material_rows: List[Dict[str, Any]] = []
-        for job in self.jobs_store.all_completed():
+        for job in self.jobs_store.all_completed(owner_wallet):
             for result in (job.get("result") or {}).get("results", []) or []:
                 structure = result.get("structure")
                 if isinstance(structure, dict) and "__matchain_pymatgen_structure__" in structure:

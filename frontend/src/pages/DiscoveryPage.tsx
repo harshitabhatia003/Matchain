@@ -13,7 +13,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
-import { fetchJson, postJson } from '../lib/api';
+import { fetchJson, postJson, setApiAuth } from '../lib/api';
 import { registryConfigured } from '../services/contractClient';
 import { registerGeneratedCandidate, type GeneratedCandidate } from '../services/registration';
 import { useWallet } from '../services/wallet';
@@ -32,53 +32,28 @@ const initialForm = {
 export default function DiscoveryPage() {
   const [form, setForm] = useState(initialForm);
   const [status, setStatus] = useState<string>('Ready');
-  const [jobId, setJobId] = useState<string | null>(() => {
-    try {
-      const saved = localStorage.getItem('matchain_active_discovery_job_id');
-      if (saved && saved !== 'cleared') return saved;
-      return null;
-    } catch {
-      return null;
-    }
-  });
-  const [job, setJob] = useState<DiscoveryJob | null>(() => {
-    try {
-      const savedId = localStorage.getItem('matchain_active_discovery_job_id');
-      if (savedId && savedId !== 'cleared') {
-        const cached = sessionStorage.getItem(`matchain_discovery_job_data_${savedId}`);
-        if (cached) return JSON.parse(cached);
-      }
-    } catch {}
-    return null;
-  });
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [job, setJob] = useState<DiscoveryJob | null>(null);
   const [requestError, setRequestError] = useState('');
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState('');
   const [registeringHash, setRegisteringHash] = useState<string | null>(null);
   const [storageConsent, setStorageConsent] = useState(false);
-  const { connected, connect, getSigner, correctNetwork } = useWallet();
+  const { connected, connect, getSigner, correctNetwork, address } = useWallet();
 
-  // If no job in state, check if there is a recent completed discovery run on the backend
+  // Restore only this wallet's last discovery. Never adopt another account's global recent job.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('matchain_active_discovery_job_id');
-      if (saved === 'cleared') return;
-    } catch {}
-
-    if (!jobId) {
-      fetchJson<{ recent_jobs?: Array<{ id: string; status: string }> }>('/api/dashboard/stats')
-        .then((stats) => {
-          const latestCompleted = stats?.recent_jobs?.find((j) => j.status === 'completed');
-          if (latestCompleted?.id) {
-            setJobId(latestCompleted.id);
-            try {
-              localStorage.setItem('matchain_active_discovery_job_id', latestCompleted.id);
-            } catch {}
-          }
-        })
-        .catch(() => undefined);
+    setJob(null);
+    if (!address) { setJobId(null); return; }
+    const saved = localStorage.getItem(`matchain_active_discovery_job_id_${address.toLowerCase()}`);
+    setJobId(saved || null);
+    if (saved) {
+      try {
+        const cached = sessionStorage.getItem(`matchain_discovery_job_data_${address.toLowerCase()}_${saved}`);
+        if (cached) setJob(JSON.parse(cached));
+      } catch { /* stale cache is ignored */ }
     }
-  }, [jobId]);
+  }, [address]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -92,7 +67,7 @@ export default function DiscoveryPage() {
         if (current.status === 'completed') {
           setStatus('Generation completed');
           try {
-            sessionStorage.setItem(`matchain_discovery_job_data_${jobId}`, JSON.stringify(current));
+          sessionStorage.setItem(`matchain_discovery_job_data_${address?.toLowerCase()}_${jobId}`, JSON.stringify(current));
           } catch {}
           return;
         }
@@ -114,7 +89,7 @@ export default function DiscoveryPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [jobId]);
+  }, [jobId, address]);
 
   const handleChange = (field: string, value: string | number | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -142,11 +117,17 @@ export default function DiscoveryPage() {
     };
 
     try {
+      let walletAddress = address;
+      if (!walletAddress) {
+        await connect();
+        walletAddress = await (await getSigner()).getAddress();
+        setApiAuth(walletAddress);
+      }
       const data = await postJson<{ job_id: string }>('/api/discovery/generate', payload);
       setStatus('Queued');
       setJobId(data.job_id);
       try {
-        localStorage.setItem('matchain_active_discovery_job_id', data.job_id);
+        localStorage.setItem(`matchain_active_discovery_job_id_${walletAddress.toLowerCase()}`, data.job_id);
       } catch {}
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : 'Failed to start the scientific discovery job.');
@@ -162,9 +143,9 @@ export default function DiscoveryPage() {
     setStatus('Ready');
     try {
       if (jobId) {
-        sessionStorage.removeItem(`matchain_discovery_job_data_${jobId}`);
+        sessionStorage.removeItem(`matchain_discovery_job_data_${address?.toLowerCase()}_${jobId}`);
       }
-      localStorage.setItem('matchain_active_discovery_job_id', 'cleared');
+      if (address) localStorage.removeItem(`matchain_active_discovery_job_id_${address.toLowerCase()}`);
     } catch {}
   };
 

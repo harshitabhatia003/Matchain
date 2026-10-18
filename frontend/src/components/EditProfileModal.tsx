@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Lock,
   Atom,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useWalletState } from '../services/wallet';
@@ -38,7 +39,7 @@ interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
-  const { user, userProfile, updateUserProfile } = useAuth();
+  const { user, userProfile, updateUserProfile, logOut } = useAuth();
   const wallet = useWalletState();
   const activeWallet = wallet?.connected && wallet?.address ? wallet.address : userProfile?.walletAddress;
 
@@ -228,28 +229,42 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           </div>
 
           {/* Action Buttons */}
-          <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-white/[0.06]">
+          <div className="mt-6 flex items-center justify-between gap-3 pt-3 border-t border-white/[0.06]">
             <button
               type="button"
-              onClick={onClose}
-              className="button-secondary text-xs px-4 py-2"
+              onClick={async () => {
+                await logOut();
+                onClose();
+              }}
+              className="flex items-center gap-1.5 text-xs text-rose-400 hover:text-rose-300 font-mono hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition"
+              title="Sign Out of Researcher Account"
             >
-              Cancel
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign Out</span>
             </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="button-primary text-xs px-5 py-2 flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Saving…</span>
-                </>
-              ) : (
-                <span>Save Profile</span>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="button-secondary text-xs px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="button-primary text-xs px-5 py-2 flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>Saving…</span>
+                  </>
+                ) : (
+                  <span>Save Profile</span>
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

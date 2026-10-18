@@ -28,6 +28,16 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Native option popups otherwise inherit the white foreground on white menu. */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  color: #e9ecee;
+  background-color: #0c1017;
+}
+
 /* Subtle cinematic noise grain texture */
 .film-grain {
   position: fixed;

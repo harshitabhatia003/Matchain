@@ -377,6 +377,38 @@ To interact with on-chain material registration and marketplace licensing:
 
 ---
 
+## Materials IP Marketplace Architecture (Buyer, Seller, Validator)
+
+The MatChain marketplace operates as a decentralized intellectual property protocol tailored for crystal structures, pairing automated smart contract escrow with off-chain AES-256-GCM encrypted IPFS delivery and a cryptoeconomic **Proof-of-Validation** consensus model:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        3-ROLE MARKETPLACE ENGINE                       │
+├────────────────────────────────────────────────────────────────────────┤
+│ 🛒 BUYER CATALOG                                                       │
+│ • Filter by application: Battery, Solar/Perovskite, Superconductor     │
+│ • Obfuscated 3D Crystal preview (masks fractional coordinates)         │
+│ • 1-Click MetaMask escrow purchase (0.1 ETH)                           │
+│ • "My Purchased Vault": Decrypted CIF download & License Certificate   │
+├────────────────────────────────────────────────────────────────────────┤
+│ 💼 SELLER STUDIO                                                       │
+│ • Selects AI candidates from Discovery Hub or custom CIF upload        │
+│ • Sets pricing in ETH and chooses licensing terms (Research/Commercial)│
+│ • Automated AES-256-GCM encryption & IPFS pinning                      │
+│ • Real-time revenue analytics: Total ETH earned & license sales counter│
+├────────────────────────────────────────────────────────────────────────┤
+│ 🛡️ VALIDATOR HUB (Proof-of-Validation Consensus Engine)               │
+│ • Requires 0.05 ETH security bond stake (Skin in the Game)             │
+│ • Audit Queue: Physics screening pipeline (E_hull <= 0.05 eV/atom,     │
+│   atomic distance packing, and multi-model jury consensus)            │
+│ • 1-Click "Approve & Stake Attestation" stamps Verified badge on-chain│
+│ • Earns 5% protocol fee reward; dishonest approvals are slashed       │
+│ • 48-hour dispute / challenge window protects against fraud            │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Security & Access-Control Architecture
 
 ### IPFS Content Protection (AES-256-GCM)
@@ -391,14 +423,14 @@ To guarantee true confidentiality for proprietary crystal structures:
 
 ### Buyer vs. Seller Access Control Matrix
 
-| Feature / Data | Unauthenticated | Authenticated Buyer (Before Purchase) | Authenticated Buyer (After Purchase) | Seller (Material Owner) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Public Metadata** (`formula`, `density`, `price`) | Allowed | Allowed | Allowed | Allowed |
-| **Material Private CID / IPFS URI** | ❌ Blocked | ❌ Blocked | ❌ **Permanently Hidden** | Allowed |
-| **IPFS Gateway Links & Share Modal** | ❌ Blocked | ❌ Blocked | ❌ Blocked | Allowed |
-| **Storage Pins Listing** (`/api/storage/pins`) | `401 Unauthorized` | Shows only buyer's own uploads | Shows only buyer's own uploads | Shows seller's own CIDs |
-| **Content Retrieval** (`/api/storage/content/{cid}`) | `401 Unauthorized` | `403 Forbidden` | Decrypted data (CID omitted) | Decrypted data + CID + Share bundle |
-| **Authorized File Download** (`/api/storage/download/{id}`) | `401 Unauthorized` | `403 Forbidden` | Decrypted file download | Decrypted file download |
+| Feature / Data | Unauthenticated | Authenticated Buyer (Before Purchase) | Authenticated Buyer (After Purchase) | Seller (Material Owner) | Validator |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Public Metadata** (`formula`, `density`, `price`) | Allowed | Allowed | Allowed | Allowed | Allowed |
+| **Material Private CID / IPFS URI** | ❌ Blocked | ❌ Blocked | ❌ **Permanently Hidden** | Allowed | ❌ Blocked |
+| **IPFS Gateway Links & Share Modal** | ❌ Blocked | ❌ Blocked | ❌ Blocked | Allowed | ❌ Blocked |
+| **Storage Pins Listing** (`/api/storage/pins`) | `401 Unauthorized` | Shows only buyer's own uploads | Shows only buyer's own uploads | Shows seller's own CIDs | Shows own uploads |
+| **Content Retrieval** (`/api/storage/content/{cid}`) | `401 Unauthorized` | `403 Forbidden` | Decrypted data (CID omitted) | Decrypted data + CID | Decrypted audit screen |
+| **Authorized File Download** (`/api/storage/download/{id}`) | `401 Unauthorized` | `403 Forbidden` | Decrypted file download | Decrypted file download | ❌ Blocked |
 
 ### On-Chain Purchase Verification
 
@@ -416,7 +448,7 @@ Purchase verification is strictly enforced server-side:
 
 ## Verification & Testing
 
-### 1. Run Backend Automated Tests (17/17 Tests)
+### 1. Run Backend Automated Tests (21/21 Tests)
 
 Activate the backend virtual environment and execute `pytest`:
 
@@ -439,13 +471,17 @@ tests/test_access_control.py::test_8_public_material_metadata_remains_accessible
 tests/test_blockchain_service.py::test_transaction_requires_configured_signer_and_successful_mined_receipt PASSED
 tests/test_blockchain_service.py::test_deployment_manifest_detects_chain_reset_and_wrong_marketplace_link PASSED
 tests/test_blockchain_service.py::test_contract_loader_checks_address_has_code_and_chain PASSED
+tests/test_marketplace.py::test_marketplace_stats PASSED
+tests/test_marketplace.py::test_marketplace_audit PASSED
+tests/test_marketplace.py::test_marketplace_validate_attestation PASSED
+tests/test_marketplace.py::test_marketplace_listings_enriched PASSED
 tests/test_persistence_and_storage.py::test_jobs_survive_restart_and_running_jobs_are_marked_interrupted PASSED
 tests/test_persistence_and_storage.py::test_discovery_service_persists_completed_results_and_material_views PASSED
 tests/test_persistence_and_storage.py::test_storage_uses_explicit_local_json_fallback PASSED
 tests/test_persistence_and_storage.py::test_storage_uses_configured_ipfs_api PASSED
 tests/test_persistence_and_storage.py::test_storage_service_upload_file_and_get_content PASSED
 tests/test_persistence_and_storage.py::test_cidv1_computation_standard_format PASSED
-======================= 17 passed in 40.31s =======================
+======================= 21 passed in 43.07s =======================
 ```
 
 ### 2. Run Frontend Build & Type Check
@@ -487,11 +523,42 @@ npm test
 
 ### 4. MetaMask "Wrong Network" or Transaction Rejection
 - **Cause**: MetaMask is connected to Ethereum Mainnet or a different testnet instead of Ganache.
-- **Solution**: Switch MetaMask to `Ganache Local` (`http://127.0.0.1:8545`, Chain ID `1337`). If you restarted Ganache, reset your account nonce in MetaMask: **Settings > Advanced > Clear activity tab data**.
+- **Solution**: Switch MetaMask to `Ganache Local` (`http://127.0.0.1:7545`, Chain ID `1337`). If you restarted Ganache, reset your account nonce in MetaMask: **Settings > Advanced > Clear activity tab data**.
 
 ### 5. IPFS Status Shows "Offline (Cache Mode)"
 - **Cause**: The local Kubo daemon is not running on port 5001.
 - **Solution**: This is a normal and supported fallback state! MatChain will store and retrieve discoveries from `matchain_ipfs_store.json`. To enable live IPFS daemon mode, open a terminal and run `ipfs daemon`.
+
+---
+
+## End-to-End Localhost Demo Walkthrough (Aarav, Priya & Rohan)
+
+Follow this 3-step script to demo the complete decentralized materials economy on localhost:
+
+### Step 1: Aarav (Seller) Lists a Crystal
+1. Open the frontend at [http://localhost:5173](http://localhost:5173).
+2. Connect your wallet (e.g. Account 0: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`).
+3. Click **Marketplace** in the navigation bar and select the **Seller Studio** tab.
+4. Pick a crystal recipe from the dropdown (e.g., `Li3V2(PO4)3` or `TiVAl`), set a license price (e.g., `0.02 ETH`), choose **Commercial Research**, and click **Publish to Marketplace**.
+5. Confirm the transaction in MetaMask. The listing is now recorded on the local EVM blockchain.
+
+### Step 2: Priya (Validator) Audits & Attests Stability
+1. Switch to the **Validator Hub** tab in the Marketplace.
+2. Click **Run Pre-Audit Inspection** on the pending material.
+3. The screening pipeline computes:
+   - Energy above convex hull ($E_{\text{hull}} \le 0.05 \text{ eV/atom}$)
+   - Atomic packing distance clearances
+   - Multi-model ensemble consensus
+4. Click **Stake 0.05 ETH & Approve Attestation**.
+5. Priya's cryptographic attestation is saved, and the material earns the **Verified Material** badge.
+
+### Step 3: Rohan (Buyer) Purchases & Accesses the Protected Structure
+1. Switch MetaMask to Buyer account (Account 1: `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`).
+2. In the **Browse Marketplace** tab, locate the verified listing.
+3. Click **Acquire License (0.02 ETH)** and approve the transaction.
+4. Switch to the **My Purchased Licenses** tab:
+   - Click **View License & Provenance Certificate** to view the on-chain ownership certificate.
+   - Click **Download Decrypted CIF** to retrieve the AES-256 decrypted crystal structure file directly to your disk.
 
 ---
 

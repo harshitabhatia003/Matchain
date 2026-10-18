@@ -55,3 +55,13 @@ class FileUploadPayload(BaseModel):
 
 class StoragePinRequest(BaseModel):
     cid: str
+
+
+class MarketplaceAuditRequest(BaseModel):
+    material_hash: str
+
+
+class MarketplaceValidateRequest(BaseModel):
+    material_hash: str
+    transaction_hash: str
+    score: float = Field(0.95, ge=0.0, le=1.0)

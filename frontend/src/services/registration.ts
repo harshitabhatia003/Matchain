@@ -1,4 +1,4 @@
-import { postJson } from '../lib/api';
+import { postJson, setApiAuth } from '../lib/api';
 import { registerMaterial as registerOnchain, shortHash } from './contractClient';
 import type { Signer } from 'ethers';
 
@@ -14,6 +14,10 @@ export type GeneratedCandidate = {
 };
 
 export async function registerGeneratedCandidate(signer: Signer, candidate: GeneratedCandidate) {
+  // Make sure the upload is attributed to the same wallet that signs the
+  // registry transaction; the wallet state effect may not have run yet.
+  const ownerWallet = await signer.getAddress();
+  setApiAuth(ownerWallet);
   const metadata = {
     formula: candidate.formula,
     density: candidate.density,
@@ -24,7 +28,11 @@ export async function registerGeneratedCandidate(signer: Signer, candidate: Gene
   };
   const stored = await postJson<{ storage_reference: string; storage_backend: string; is_ipfs: boolean }>(
     '/api/storage/upload',
-    { content: { material_hash: candidate.material_hash, ...metadata, structure: candidate.structure_payload } },
+    {
+      material_hash: candidate.material_hash,
+      is_confidential: true,
+      content: { material_hash: candidate.material_hash, ...metadata, structure: candidate.structure_payload },
+    },
   );
   const transaction = await registerOnchain(signer, {
     fingerprint: candidate.material_hash,

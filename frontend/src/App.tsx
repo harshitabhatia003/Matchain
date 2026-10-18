@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { NavLink, Route, Routes, Link, useLocation } from 'react-router-dom';
 import {
   Wallet,
@@ -9,6 +9,11 @@ import {
   ExternalLink,
   Loader2,
   ChevronRight,
+  ChevronDown,
+  LogOut,
+  Copy,
+  Check,
+  User as UserIcon,
 } from 'lucide-react';
 import { useWalletState } from './services/wallet';
 import { useAuth } from './context/AuthContext';
@@ -39,16 +44,52 @@ const navLinks = [
 export default function App() {
   const location = useLocation();
   const wallet = useWalletState();
-  const { user, userProfile, linkWalletAddress } = useAuth();
+  const { user, userProfile, linkWalletAddress, logOut } = useAuth();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [metaMaskModalOpen, setMetaMaskModalOpen] = useState(false);
+  const [walletMenuOpen, setWalletMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const walletMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const address = wallet?.address ?? null;
   const connected = wallet?.connected ?? false;
   const correctNetwork = wallet?.correctNetwork ?? false;
   const isConnecting = wallet?.connecting ?? false;
   const walletError = wallet?.error ?? '';
+
+  // Close wallet and profile dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (walletMenuRef.current && !walletMenuRef.current.contains(target)) {
+        setWalletMenuOpen(false);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    if (walletMenuOpen || profileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [walletMenuOpen, profileMenuOpen]);
+
+  const handleCopyAddress = () => {
+    if (!address) return;
+    void navigator.clipboard.writeText(address);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  };
+
+  const handleDisconnect = () => {
+    wallet?.disconnect();
+    setWalletMenuOpen(false);
+  };
 
   // Auto-sync connected MetaMask wallet address to Firestore user profile and API client
   useEffect(() => {
@@ -139,40 +180,154 @@ export default function App() {
           </nav>
 
           {/* Right Floating Actions (Wallet & Identity) */}
-          <div className="flex items-center gap-3">
-            {/* Wallet Status Chip / Connect Button */}
+          <div className="flex items-center gap-2">
+            {/* Wallet Status Chip / Connect & Disconnect Button */}
             {connected ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.03] text-[11px] font-mono text-emerald-300">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="tracking-wider">{address?.slice(0, 6)}…{address?.slice(-4)}</span>
-                {!correctNetwork && (
+              <div className="relative" ref={walletMenuRef}>
+                {/* Unified Sleek Pill */}
+                <div className="flex items-center gap-1.5 h-8 pl-3 pr-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/[0.05] hover:border-emerald-500/40 hover:bg-emerald-500/[0.08] transition-all duration-200 shadow-[0_0_12px_rgba(16,185,129,0.06)]">
+                  {/* Address & Dropdown Trigger */}
                   <button
                     type="button"
-                    onClick={() => void wallet?.switchNetwork().catch(() => undefined)}
-                    className="ml-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] hover:bg-amber-500/30 transition flex items-center gap-1"
-                    title="Switch MetaMask to Chain 1337 (Local EVM)"
+                    onClick={() => setWalletMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-2 text-[11px] font-mono text-emerald-300 hover:text-white transition whitespace-nowrap focus:outline-none select-none"
+                    title="View Wallet Details & Options"
                   >
-                    <span>Switch Chain</span>
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"></span>
+                    </span>
+                    <span className="font-semibold tracking-wide whitespace-nowrap">
+                      {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''}
+                    </span>
+                    <ChevronDown
+                      className={`h-3 w-3 text-emerald-400/70 transition-transform duration-200 ${
+                        walletMenuOpen ? 'rotate-180 text-white' : ''
+                      }`}
+                    />
                   </button>
+
+                  {!correctNetwork && (
+                    <button
+                      type="button"
+                      onClick={() => void wallet?.switchNetwork().catch(() => undefined)}
+                      className="px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-mono hover:bg-amber-500/30 transition flex items-center gap-1 whitespace-nowrap"
+                      title="Switch MetaMask to Chain 1337 (Local EVM)"
+                    >
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      <span>Switch</span>
+                    </button>
+                  )}
+
+                  {/* Subtle Divider */}
+                  <div className="h-3.5 w-[1px] bg-emerald-500/20 mx-0.5" />
+
+                  {/* 1-Click Quick Disconnect */}
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    className="p-1 rounded-full text-emerald-400/50 hover:text-rose-400 hover:bg-rose-500/10 transition-colors focus:outline-none"
+                    title="Disconnect Wallet"
+                    aria-label="Disconnect Wallet"
+                  >
+                    <LogOut className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Floating Web3 Dropdown Popover */}
+                {walletMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-white/[0.08] bg-[#0c1222]/95 backdrop-blur-xl shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-white/[0.06]">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Connected Wallet</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        {correctNetwork ? 'Ganache 1337' : 'Wrong Chain'}
+                      </span>
+                    </div>
+
+                    {/* Full Address & Copy */}
+                    <div className="mt-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs text-slate-200 truncate select-all">
+                        {address}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyAddress}
+                        className="p-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-slate-400 hover:text-white transition shrink-0"
+                        title={copiedAddress ? 'Address copied!' : 'Copy Address'}
+                      >
+                        {copiedAddress ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Network Switcher Alert if needed */}
+                    {!correctNetwork && (
+                      <div className="mt-2.5 p-2 rounded-xl bg-amber-500/[0.08] border border-amber-500/20 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-amber-300 text-[11px]">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                          <span>Wrong network</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void wallet?.switchNetwork().catch(() => undefined)}
+                          className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-mono transition whitespace-nowrap"
+                        >
+                          Switch to 1337
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Disconnect Action */}
+                    <div className="mt-3 pt-2.5 border-t border-white/[0.06]">
+                      <button
+                        type="button"
+                        disabled={isConnecting}
+                        onClick={() => void wallet?.switchAccount().catch(() => undefined)}
+                        className="w-full mb-2 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 text-cyan-200 text-xs font-mono transition disabled:opacity-50"
+                      >
+                        {isConnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+                        <span>Switch MetaMask account</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-300 text-xs font-mono transition"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>Disconnect Wallet</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
+              /* Disconnected State - High Tech Sleek Pill Button */
               <button
                 type="button"
                 onClick={handleConnectWallet}
                 disabled={isConnecting}
-                className="btn-overworld text-[11px] py-1.5 px-3.5 flex items-center gap-2 group"
-                title="Connect Web3 Wallet"
+                className="h-8 px-3.5 rounded-full border border-cyan-500/35 bg-cyan-500/[0.08] hover:bg-cyan-500/[0.16] hover:border-cyan-500/60 text-cyan-300 hover:text-white transition-all duration-200 font-mono text-[11px] font-medium tracking-wide flex items-center gap-2 whitespace-nowrap shadow-[0_0_14px_rgba(6,182,212,0.1)] hover:shadow-[0_0_20px_rgba(6,182,212,0.22)] group focus:outline-none"
+                title="Connect Web3 MetaMask Wallet"
               >
                 {isConnecting ? (
                   <>
-                    <Loader2 className="h-3 w-3 animate-spin text-[#38bdf8]" />
-                    <span>Connecting…</span>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+                    <span className="whitespace-nowrap">Connecting…</span>
                   </>
                 ) : (
                   <>
-                    <Wallet className="h-3.5 w-3.5 text-[#aab9c7] group-hover:text-white transition-colors" />
-                    <span>Connect</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+                    </span>
+                    <Wallet className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                    <span className="whitespace-nowrap">Connect Wallet</span>
                   </>
                 )}
               </button>
@@ -180,26 +335,90 @@ export default function App() {
 
             {/* Researcher Profile / Sign In */}
             {user ? (
-              <button
-                type="button"
-                onClick={() => setIsEditProfileOpen(true)}
-                className="flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-full border border-[#e9ecee]/12 bg-[#e9ecee]/[0.02] text-[11px] text-[#e9ecee] hover:border-[#e9ecee]/25 hover:bg-[#e9ecee]/[0.05] transition"
-                title="Edit Researcher Identity"
-              >
-                <span className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center font-mono text-[9px] text-white">
-                  {userProfile?.displayName ? userProfile.displayName.charAt(0).toUpperCase() : 'R'}
-                </span>
-                <span className="hidden sm:inline font-mono text-[10px] max-w-[90px] truncate">
-                  {userProfile?.displayName || user.email?.split('@')[0]}
-                </span>
-                <Edit3 className="h-2.5 w-2.5 text-[#6e8799]" />
-              </button>
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 h-8 pl-2 pr-3 rounded-full border border-white/[0.1] bg-white/[0.03] hover:border-white/[0.22] hover:bg-white/[0.07] transition text-[11px] text-white whitespace-nowrap shadow-sm group select-none"
+                  title="Researcher Identity & Account"
+                >
+                  <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center font-mono text-[9px] font-bold">
+                    {userProfile?.displayName ? userProfile.displayName.charAt(0).toUpperCase() : 'R'}
+                  </span>
+                  <span className="hidden sm:inline font-mono text-[10px] max-w-[105px] truncate text-slate-200 group-hover:text-white">
+                    {userProfile?.displayName || user.email?.split('@')[0]}
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 text-slate-400 group-hover:text-white transition-transform duration-200 ${
+                      profileMenuOpen ? 'rotate-180 text-white' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Researcher Profile Dropdown Popover */}
+                {profileMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-white/[0.08] bg-[#0c1222]/95 backdrop-blur-xl shadow-2xl p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2.5 border-b border-white/[0.06]">
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Researcher Profile</span>
+                      <span className="font-mono text-[10px] text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+                        {userProfile?.role || 'Scientist'}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1">
+                      <div className="font-medium text-xs text-white truncate">
+                        {userProfile?.displayName || 'Anonymous Researcher'}
+                      </div>
+                      <div className="font-mono text-[11px] text-slate-400 truncate">
+                        {user.email || 'guest@matchain.org'}
+                      </div>
+                      {userProfile?.organization && (
+                        <div className="font-mono text-[10px] text-slate-500 truncate pt-0.5">
+                          {userProfile.organization}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-3 space-y-1.5 pt-2 border-t border-white/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setIsEditProfileOpen(true);
+                        }}
+                        className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] text-slate-200 hover:text-white text-xs font-mono transition"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Edit3 className="h-3.5 w-3.5 text-cyan-400" />
+                          <span>Edit Profile</span>
+                        </span>
+                        <ChevronRight className="h-3 w-3 text-slate-500" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setProfileMenuOpen(false);
+                          await logOut();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-rose-300 text-xs font-mono transition"
+                      >
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link
                 to="/login"
-                className="btn-overworld-primary text-[11px] py-1.5 px-3.5"
+                className="h-8 px-3.5 rounded-full border border-cyan-500/40 bg-cyan-500/[0.12] hover:bg-cyan-500/[0.22] hover:border-cyan-500/60 text-cyan-300 hover:text-white font-mono text-[11px] font-medium flex items-center justify-center gap-1.5 tracking-wider transition whitespace-nowrap shadow-[0_0_12px_rgba(6,182,212,0.12)]"
+                title="Sign In / Register Researcher Account"
               >
-                <span>Portal</span>
+                <UserIcon className="h-3.5 w-3.5" />
+                <span>Sign In</span>
               </Link>
             )}
 
@@ -233,6 +452,79 @@ export default function App() {
                 <ChevronRight className="h-3.5 w-3.5 opacity-40" />
               </NavLink>
             ))}
+
+            {/* Mobile Auth & Identity Controls */}
+            <div className="pt-3 mt-2 border-t border-white/[0.06] space-y-2">
+              {user ? (
+                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-medium text-white">{userProfile?.displayName || user.email?.split('@')[0]}</div>
+                      <div className="text-[10px] font-mono text-slate-400">{user.email}</div>
+                    </div>
+                    <span className="font-mono text-[9px] text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+                      {userProfile?.role || 'Scientist'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditProfileOpen(true)}
+                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs font-mono text-slate-300 flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Edit3 className="h-3 w-3 text-cyan-400" />
+                      <span>Edit Profile</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void logOut()}
+                      className="py-1.5 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-mono flex items-center justify-center gap-1.5 transition border border-rose-500/20"
+                    >
+                      <LogOut className="h-3 w-3" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  to="/login"
+                  className="w-full py-2.5 px-3 rounded-xl border border-cyan-500/40 bg-cyan-500/15 text-cyan-300 text-xs font-mono flex items-center justify-center gap-2 hover:bg-cyan-500/25 transition"
+                >
+                  <UserIcon className="h-4 w-4" />
+                  <span>Sign In / Create Account</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Mobile Wallet Controls */}
+            <div className="pt-2 border-t border-white/[0.06]">
+              {connected ? (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="font-mono text-xs text-emerald-300 select-all">{address?.slice(0, 6)}…{address?.slice(-4)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono text-[11px] hover:bg-rose-500/20 transition"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConnectWallet}
+                  disabled={isConnecting}
+                  className="w-full py-2.5 px-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-mono flex items-center justify-center gap-2 hover:bg-cyan-500/20 transition"
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span>Connect Wallet</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
 

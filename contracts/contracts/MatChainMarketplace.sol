@@ -52,6 +52,8 @@ contract MatChainMarketplace {
         Listing storage item = listings[materialHash];
         require(item.seller != address(0), 'No listing');
         require(!item.sold, 'Already sold');
+        (, , , , , bool verified) = registry.discoveries(materialHash);
+        require(verified, 'Material not verified');
         require(msg.value == item.price, 'Incorrect payment');
 
         item.sold = true;

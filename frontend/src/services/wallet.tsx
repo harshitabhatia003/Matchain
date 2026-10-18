@@ -37,6 +37,7 @@ type WalletContextValue = {
   isMetaMaskInstalled: boolean;
   connecting: boolean;
   connect: () => Promise<void>;
+  switchAccount: () => Promise<void>;
   switchNetwork: () => Promise<void>;
   disconnect: () => void;
   ensureNetwork: () => Promise<void>;
@@ -194,6 +195,33 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [ensureNetwork, readChain]);
 
+  const switchAccount = useCallback(async () => {
+    try {
+      setConnecting(true);
+      setError('');
+      const provider = getInjectedProvider();
+      if (!provider) throw new Error('MetaMask was not detected.');
+
+      // Re-requesting eth_accounts permission makes MetaMask show its account
+      // picker when the site is currently authorized for a different account.
+      await provider.request({
+        method: 'wallet_requestPermissions',
+        params: [{ eth_accounts: {} }],
+      });
+      const accounts = (await provider.request({ method: 'eth_accounts' })) as string[];
+      if (!accounts?.length) throw new Error('No MetaMask account was authorized for this site.');
+
+      setAddress(accounts[0]);
+      await readChain();
+    } catch (reason) {
+      const message = walletErrorMessage(reason, 'Could not switch MetaMask account.');
+      setError(message);
+      throw reason;
+    } finally {
+      setConnecting(false);
+    }
+  }, [readChain]);
+
   const switchNetwork = useCallback(async () => {
     try {
       setError('');
@@ -238,6 +266,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isMetaMaskInstalled,
       connecting,
       connect,
+      switchAccount,
       switchNetwork,
       disconnect,
       ensureNetwork,
@@ -251,6 +280,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isMetaMaskInstalled,
       connecting,
       connect,
+      switchAccount,
       switchNetwork,
       disconnect,
       ensureNetwork,

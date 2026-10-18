@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Float, String, Text, create_engine, select, update
+from sqlalchemy import Float, String, Text, create_engine, inspect, select, update
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -27,6 +27,7 @@ class DiscoveryJobRecord(Base):
     request_json: Mapped[str] = mapped_column(Text, nullable=False)
     result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_wallet: Mapped[str | None] = mapped_column(String(42), nullable=True, index=True)
 
 
 class JobsStore:
@@ -38,6 +39,11 @@ class JobsStore:
         )
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)
         Base.metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            columns = {column["name"] for column in inspect(self.engine).get_columns("discovery_jobs")}
+            if "owner_wallet" not in columns:
+                connection.exec_driver_sql("ALTER TABLE discovery_jobs ADD COLUMN owner_wallet VARCHAR(42)")
+                connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_discovery_jobs_owner_wallet ON discovery_jobs (owner_wallet)")
         self.mark_interrupted_jobs()
 
     def mark_interrupted_jobs(self) -> None:
@@ -52,7 +58,7 @@ class JobsStore:
                 )
             )
 
-    def create(self, job_id: str, payload: dict[str, Any], timestamp: float) -> None:
+    def create(self, job_id: str, payload: dict[str, Any], timestamp: float, owner_wallet: str | None = None) -> None:
         with self.sessions.begin() as session:
             session.add(DiscoveryJobRecord(
                 job_id=job_id,
@@ -61,6 +67,7 @@ class JobsStore:
                 updated_at=timestamp,
                 progress=0.0,
                 request_json=json.dumps(payload, default=_json_default),
+                owner_wallet=owner_wallet.lower() if owner_wallet else None,
             ))
 
     def update(self, job_id: str, timestamp: float, **values: Any) -> None:
@@ -77,18 +84,24 @@ class JobsStore:
             record = session.get(DiscoveryJobRecord, job_id)
             return _as_job(record) if record else None
 
-    def recent(self, limit: int = 5) -> list[dict[str, Any]]:
+    def recent(self, limit: int = 5, owner_wallet: str | None = None) -> list[dict[str, Any]]:
         with self.sessions() as session:
-            records = session.scalars(
-                select(DiscoveryJobRecord).order_by(DiscoveryJobRecord.created_at.desc()).limit(limit)
-            ).all()
+            query = select(DiscoveryJobRecord).order_by(DiscoveryJobRecord.created_at.desc())
+            if owner_wallet:
+                query = query.where(DiscoveryJobRecord.owner_wallet == owner_wallet.lower())
+            else:
+                query = query.where(DiscoveryJobRecord.owner_wallet.is_(None))
+            records = session.scalars(query.limit(limit)).all()
             return [_as_job(record) for record in records]
 
-    def all_completed(self) -> list[dict[str, Any]]:
+    def all_completed(self, owner_wallet: str | None = None) -> list[dict[str, Any]]:
         with self.sessions() as session:
-            records = session.scalars(
-                select(DiscoveryJobRecord).where(DiscoveryJobRecord.status == "completed").order_by(DiscoveryJobRecord.created_at)
-            ).all()
+            query = select(DiscoveryJobRecord).where(DiscoveryJobRecord.status == "completed").order_by(DiscoveryJobRecord.created_at)
+            if owner_wallet:
+                query = query.where(DiscoveryJobRecord.owner_wallet == owner_wallet.lower())
+            else:
+                query = query.where(DiscoveryJobRecord.owner_wallet.is_(None))
+            records = session.scalars(query).all()
             return [_as_job(record) for record in records]
 
 
@@ -113,4 +126,5 @@ def _as_job(record: DiscoveryJobRecord) -> dict[str, Any]:
         "payload": json.loads(record.request_json),
         "result": json.loads(record.result_json) if record.result_json else None,
         "error": record.error,
+        "owner_wallet": record.owner_wallet,
     }
