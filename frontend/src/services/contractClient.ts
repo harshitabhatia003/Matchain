@@ -358,6 +358,22 @@ export async function attestMaterial(signer: Signer, materialHash: string) {
   await assertContract(provider, networkConfig.registryAddress, 'registry');
   const contract = new Contract(getAddress(networkConfig.registryAddress), registryAbi, signer);
   const fingerprint = fingerprintOf(materialHash);
+  const record = await contract.discoveries(fingerprint);
+  const creator = String(record.creator);
+  if (creator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+    throw new Error(
+      'This material is not registered in the configured registry. Refresh the marketplace and confirm it is connected to the same network and registry used to create the listing.',
+    );
+  }
+  if (Boolean(record.verified)) {
+    throw new Error(
+      'This material has already been verified on-chain. Refresh the marketplace to update its validation status.',
+    );
+  }
+  const validator = await signer.getAddress();
+  if (creator.toLowerCase() === validator.toLowerCase()) {
+    throw new Error('A material creator cannot validate their own listing. Switch to an independent validator wallet.');
+  }
   const tx = await contract.verifyDiscovery(fingerprint, { value: parseEther('0.05') });
   const result = await verifyTransaction(tx, {
     contractAddress: getAddress(networkConfig.registryAddress),

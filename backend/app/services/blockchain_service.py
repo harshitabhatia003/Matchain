@@ -86,6 +86,19 @@ class BlockchainService:
         try:
             if not self.available or not self.deployment:
                 return False
+            # The API can start before Ganache is ready. In that case the
+            # constructor cannot bind contract instances; retry once the node
+            # comes online instead of leaving this service permanently offline.
+            if self.registry is None:
+                self.registry = self._load_contract(
+                    "MatChainRegistry",
+                    self.deployment.get("registry") or os.getenv("CONTRACT_REGISTRY_ADDRESS", ""),
+                )
+            if self.marketplace is None:
+                self.marketplace = self._load_contract(
+                    "MatChainMarketplace",
+                    self.deployment.get("marketplace") or os.getenv("CONTRACT_MARKETPLACE_ADDRESS", ""),
+                )
             if int(self.deployment.get("chainId", -1)) != self.web3.eth.chain_id:
                 return False
             if self.deployment.get("rpcUrl", "").rstrip("/") != GANACHE_RPC_URL.rstrip("/"):

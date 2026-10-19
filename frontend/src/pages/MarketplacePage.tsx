@@ -163,6 +163,9 @@ export default function MarketplacePage() {
             const matchBackend = backendListings.find(
               (b) => b.material_hash.toLowerCase() === item.material_hash.toLowerCase()
             );
+            const registryRecord = registeredMaterials.find(
+              (material) => material.fingerprint.toLowerCase() === item.material_hash.toLowerCase()
+            );
             return {
               ...item,
               formula: matchBackend?.formula ?? formulaFor(item.material_hash),
@@ -170,7 +173,10 @@ export default function MarketplacePage() {
               e_hull: matchBackend?.e_hull,
               predicted_formation_energy: matchBackend?.predicted_formation_energy,
               consensus_spread: matchBackend?.consensus_spread,
-              verified: matchBackend?.verified ?? false,
+              // The registry is the source of truth for attestation state. The
+              // backend can lag after an on-chain transaction and leave a
+              // verified listing incorrectly visible in the pending queue.
+              verified: registryRecord?.verified ?? matchBackend?.verified ?? false,
               validator: matchBackend?.validator ?? null,
               validation_score: matchBackend?.validation_score ?? null,
               category: matchBackend?.category,
@@ -207,7 +213,17 @@ export default function MarketplacePage() {
   useEffect(() => {
     setPreviewCif('');
     setPreviewError('');
-    if (!previewMaterial || !address || !previewMaterial.sold || previewMaterial.buyer.toLowerCase() !== address.toLowerCase()) return;
+    if (!previewMaterial || !previewMaterial.sold) return;
+    if (!address) {
+      setPreviewError('Connect the wallet that purchased this material to view its private CIF preview.');
+      return;
+    }
+    if (previewMaterial.buyer.toLowerCase() !== address.toLowerCase()) {
+      setPreviewError(
+        `This license belongs to buyer wallet ${previewMaterial.buyer}. Switch MetaMask to that wallet to view the private CIF preview.`,
+      );
+      return;
+    }
     fetchAuthorizedCif(previewMaterial.material_hash)
       .then(setPreviewCif)
       .catch((error: Error) => setPreviewError(error.message));
@@ -297,11 +313,28 @@ export default function MarketplacePage() {
       if (!connected) await connect();
       const signer = await getSigner();
       const transaction = await attestMaterial(signer, matHash);
-      await validateMarketplaceMaterial(matHash, transaction.transactionHash, activeAuditReport.overall_score);
-      setStakedBalanceEth(await readValidatorStake(createRpcProvider(), transaction.validator));
-      await refreshData();
       setActiveAuditReport(null);
-      setNotice(`Validation and 0.05 ETH stake confirmed on-chain in block ${transaction.blockNumber}.`);
+      const followUpErrors: string[] = [];
+      try {
+        setStakedBalanceEth(await readValidatorStake(createRpcProvider(), transaction.validator));
+      } catch (error) {
+        followUpErrors.push(error instanceof Error ? error.message : 'Could not refresh the stake balance.');
+      }
+      try {
+        await validateMarketplaceMaterial(matHash, transaction.transactionHash, activeAuditReport.overall_score);
+      } catch (error) {
+        followUpErrors.push(error instanceof Error ? error.message : 'Backend validation sync failed.');
+      }
+      try {
+        await refreshData();
+      } catch (error) {
+        followUpErrors.push(error instanceof Error ? error.message : 'Marketplace refresh failed.');
+      }
+      setNotice(
+        followUpErrors.length
+          ? `Validation and 0.05 ETH stake are confirmed on-chain in block ${transaction.blockNumber} (tx ${transaction.transactionHash}). Backend/UI sync needs attention: ${followUpErrors.join(' ')}`
+          : `Validation and 0.05 ETH stake confirmed on-chain in block ${transaction.blockNumber}.`,
+      );
     } catch (err: any) {
       setErrorNotice(`Attestation failed: ${err.message}`);
     } finally {
