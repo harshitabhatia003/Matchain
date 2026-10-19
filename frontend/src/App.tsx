@@ -14,6 +14,8 @@ import {
   Copy,
   Check,
   User as UserIcon,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useWalletState } from './services/wallet';
 import { useAuth } from './context/AuthContext';
@@ -50,6 +52,10 @@ export default function App() {
   const [metaMaskModalOpen, setMetaMaskModalOpen] = useState(false);
   const [walletMenuOpen, setWalletMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return window.localStorage.getItem('matchain-theme') === 'light' ? 'light' : 'dark';
+  });
   const [copiedAddress, setCopiedAddress] = useState(false);
   const walletMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -59,6 +65,13 @@ export default function App() {
   const correctNetwork = wallet?.correctNetwork ?? false;
   const isConnecting = wallet?.connecting ?? false;
   const walletError = wallet?.error ?? '';
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('matchain-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((current) => current === 'dark' ? 'light' : 'dark');
 
   // Close wallet and profile dropdowns when clicking outside
   useEffect(() => {
@@ -422,6 +435,17 @@ export default function App() {
               </Link>
             )}
 
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle hidden md:flex h-8 w-8 rounded-full border border-white/[0.1] bg-white/[0.03] hover:bg-white/[0.08] text-slate-300 hover:text-white transition items-center justify-center shrink-0"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+              aria-pressed={theme === 'light'}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
             {/* Mobile Menu Hamburger */}
             <button
               type="button"
@@ -455,6 +479,18 @@ export default function App() {
 
             {/* Mobile Auth & Identity Controls */}
             <div className="pt-3 mt-2 border-t border-white/[0.06] space-y-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] text-slate-200 text-xs font-mono transition"
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+                aria-pressed={theme === 'light'}
+              >
+                <span>Appearance</span>
+                <span className="flex items-center gap-2 text-cyan-300">
+                  {theme === 'dark' ? <><Sun className="h-3.5 w-3.5" /> Light</> : <><Moon className="h-3.5 w-3.5" /> Dark</>}
+                </span>
+              </button>
               {user ? (
                 <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] space-y-2">
                   <div className="flex items-center justify-between">

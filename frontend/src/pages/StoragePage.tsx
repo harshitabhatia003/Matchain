@@ -46,7 +46,9 @@ export default function StoragePage() {
   const [lookupCid, setLookupCid] = useState('');
   const [retrieving, setRetrieving] = useState(false);
   const [inspectedContent, setInspectedContent] = useState<any>(null);
+  const [inspectError, setInspectError] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const retrievePanelRef = useRef<HTMLDivElement | null>(null);
 
   // Share modal state
   const [shareCid, setShareCid] = useState<string | null>(null);
@@ -152,14 +154,25 @@ export default function StoragePage() {
 
     setRetrieving(true);
     setError('');
+    setInspectError('');
     setInspectedContent(null);
+    if (cidToLookup) setLookupCid(target);
 
     try {
       const data = await fetchJson<any>(`/api/storage/content/${encodeURIComponent(target)}`);
       setInspectedContent(data);
       setLookupCid(target);
+      if (cidToLookup) {
+        window.setTimeout(() => retrievePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+      }
     } catch (err: any) {
-      setError(err?.message || `Could not find content for CID "${target}".`);
+      const message = err?.message || `Could not find content for CID "${target}".`;
+      if (cidToLookup) {
+        setInspectError(message);
+        window.setTimeout(() => retrievePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+      } else {
+        setError(message);
+      }
     } finally {
       setRetrieving(false);
     }
@@ -369,7 +382,7 @@ export default function StoragePage() {
 
                 <button
                   type="submit"
-                  disabled={uploading || !selectedFile}
+                  disabled={uploading}
                   className="btn-overworld-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {uploading ? (
@@ -407,7 +420,7 @@ export default function StoragePage() {
 
                 <button
                   type="submit"
-                  disabled={uploading || !jsonContent.trim()}
+                  disabled={uploading}
                   className="btn-overworld-primary w-full py-2.5 text-xs flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {uploading ? (
@@ -461,7 +474,7 @@ export default function StoragePage() {
         </div>
 
         {/* Retrieve Content & Inspect by CID */}
-        <div className="card p-6 flex flex-col justify-between">
+        <div ref={retrievePanelRef} className="card p-6 flex flex-col justify-between scroll-mt-24">
           <div>
             <div className="mb-4 flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div className="flex items-center gap-2">
@@ -472,6 +485,11 @@ export default function StoragePage() {
             </div>
 
             <div className="space-y-4">
+              {inspectError && (
+                <div role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/[0.05] px-3 py-2.5 text-xs font-mono text-rose-300 break-all">
+                  {inspectError}
+                </div>
+              )}
               <div>
                 <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 block mb-1.5">
                   IPFS CID or Storage Reference

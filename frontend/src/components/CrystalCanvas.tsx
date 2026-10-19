@@ -226,6 +226,7 @@ export default function CrystalCanvas({ onSelectMarker, selectedMarkerId }: Crys
 
     const render = () => {
       time += 0.012;
+      const isLightTheme = document.documentElement.dataset.theme === 'light';
       // Gentle automatic drift when user is not dragging
       if (!isDragging) {
         targetRotY += 0.0018;
@@ -302,7 +303,9 @@ export default function CrystalCanvas({ onSelectMarker, selectedMarkerId }: Crys
             ctx.beginPath();
             ctx.moveTo(a.px, a.py);
             ctx.lineTo(b.px, b.py);
-            ctx.strokeStyle = `rgba(110, 135, 153, ${alpha * 0.6})`;
+          ctx.strokeStyle = isLightTheme
+            ? `rgba(53, 83, 108, ${Math.max(0.12, alpha * 0.9)})`
+            : `rgba(110, 135, 153, ${alpha * 0.6})`;
             ctx.stroke();
           }
         }
@@ -319,13 +322,17 @@ export default function CrystalCanvas({ onSelectMarker, selectedMarkerId }: Crys
           // Outer halo
           ctx.beginPath();
           ctx.arc(n.px, n.py, r * 2.2, 0, Math.PI * 2);
-          ctx.fillStyle = n.color === '#f59e0b' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(56, 189, 248, 0.06)';
+          ctx.fillStyle = n.color === '#f59e0b'
+            ? (isLightTheme ? 'rgba(180, 83, 9, 0.12)' : 'rgba(245, 158, 11, 0.08)')
+            : (isLightTheme ? 'rgba(8, 114, 138, 0.1)' : 'rgba(56, 189, 248, 0.06)');
           ctx.fill();
 
           // Core atom
           ctx.beginPath();
           ctx.arc(n.px, n.py, r, 0, Math.PI * 2);
-          ctx.fillStyle = n.color;
+          ctx.fillStyle = isLightTheme
+            ? n.color === '#f59e0b' ? '#b45309' : n.color === '#38bdf8' ? '#08728a' : '#49657c'
+            : n.color;
           ctx.globalAlpha = alpha;
           ctx.fill();
           ctx.globalAlpha = 1;
@@ -367,8 +374,10 @@ export default function CrystalCanvas({ onSelectMarker, selectedMarkerId }: Crys
           // Label badge box
           const badgeX = prj.px + 10;
           const badgeY = prj.py - 16;
-          ctx.fillStyle = 'rgba(8, 12, 22, 0.85)';
-          ctx.strokeStyle = isSelected ? 'rgba(56, 189, 248, 0.6)' : 'rgba(233, 236, 238, 0.18)';
+          ctx.fillStyle = isLightTheme ? 'rgba(250, 253, 255, 0.94)' : 'rgba(8, 12, 22, 0.85)';
+          ctx.strokeStyle = isSelected
+            ? (isLightTheme ? 'rgba(8, 114, 138, 0.65)' : 'rgba(56, 189, 248, 0.6)')
+            : (isLightTheme ? 'rgba(53, 83, 108, 0.28)' : 'rgba(233, 236, 238, 0.18)');
           ctx.lineWidth = 0.75;
           ctx.beginPath();
           ctx.roundRect(badgeX, badgeY, textW + 12, 18, 4);
@@ -376,7 +385,9 @@ export default function CrystalCanvas({ onSelectMarker, selectedMarkerId }: Crys
           ctx.stroke();
 
           // Label text
-          ctx.fillStyle = isSelected ? '#38bdf8' : '#e9ecee';
+          ctx.fillStyle = isLightTheme
+            ? isSelected ? '#08728a' : '#243f56'
+            : isSelected ? '#38bdf8' : '#e9ecee';
           ctx.fillText(label, badgeX + 6, badgeY + 12);
         }
       }

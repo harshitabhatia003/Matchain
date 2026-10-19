@@ -536,16 +536,16 @@ export default function DiscoveryPage() {
                     </div>
                   </dl>
 
-                  <div className="mt-4 rounded-lg bg-black/40 border border-white/[0.06] p-2.5 text-xs font-mono text-slate-400 break-all">
-                    <span className="text-slate-500 block text-[10px] uppercase">SHA-256 Crystal Fingerprint</span>
+                  <div className="discovery-fingerprint mt-4 rounded-lg bg-black/40 border border-white/[0.06] p-2.5 text-xs font-mono text-slate-400 break-all">
+                    <span className="text-slate-500 block text-[10px] uppercase mb-1">SHA-256 Crystal Fingerprint</span>
                     {candidate.material_hash}
                   </div>
 
                   <details className="mt-3 text-xs text-slate-400 font-mono">
-                    <summary className="cursor-pointer hover:text-slate-200 transition-colors">
+                    <summary className="discovery-payload-summary cursor-pointer hover:text-slate-200 transition-colors">
                       View Raw Crystal Structure Payload
                     </summary>
-                    <pre className="mt-2 max-h-44 overflow-auto rounded-lg bg-black/50 p-3 text-[11px] text-slate-300 border border-white/[0.04]">
+                    <pre className="discovery-payload mt-2 max-h-44 overflow-auto rounded-lg bg-black/50 p-3 text-[11px] text-slate-300 border border-white/[0.04]">
                       {JSON.stringify(candidate.structure_payload, null, 2)}
                     </pre>
                   </details>

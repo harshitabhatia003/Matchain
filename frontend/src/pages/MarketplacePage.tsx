@@ -710,7 +710,7 @@ export default function MarketplacePage() {
                               setBusyHash(null);
                             }
                           }}
-                          className="button-primary text-xs py-2 flex items-center justify-center gap-1.5 border-emerald-500/30 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                          className="button-primary marketplace-download-button text-xs py-2 flex items-center justify-center gap-1.5 border-emerald-500/30 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
                         >
                           <Download className="h-3.5 w-3.5" />
                           <span>{busyHash === item.material_hash ? 'Decrypting…' : 'Download CIF'}</span>
